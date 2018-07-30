@@ -702,90 +702,6 @@ bool forthPassTestWithCompetitiveReadOnReusedSpace()
 	return validateStaticResults(output, expected);
 }
 
-bool forthPassTestWithAmbiguousCacheLoads()
-{
-
-	/*
-	 *
-	 * 			.---------------------------.
-	 * 			|							|
-	 * 			v							|
-	 * .-------------- A -------------.		|
-	 * |							  |		|
-	 * | 100 | 100 | BLOCK_SIZE - 200 |		|
-	 * |							  |		|
-	 * '-------------- A -------------'		|
-	 *		|								|
-	 *		`------------------------.		|
-	 *								 |		|
-	 * 			.--------------------|------+
-	 * 			v	  				 v		|
-	 * .-------------- B ----------------.	|
-	 * |							  	 |	|
-	 * | 100 | 100 | 0x800 - 200 | 0x800 |	|
-	 * |							  	 |	|
-	 * '-------------- B ----------------'	|
-	 *			|							|
-	 *			`-----.						|
-	 * 			.-----|---------------------+
-	 * 			v	  v						|
-	 * .-------------- C -------------.		|
-	 * |							  |		|
-	 * | 100 | 100 | 100 |	   ...	  |		|
-	 * |							  |		|
-	 * '-------------- C -------------'		|
-	 * 						|				|
-	 * 			.-----------'				|
-	 * 			|							|
-	 * 			v							|
-	 * .-------------- D -------------.		|
-	 * |							  |		|
-	 * | 100 | 100 | BLOCK_SIZE - 200 |		|
-	 * |							  |		|
-	 * '-------------- D -------------'		|
-	 *			|				^			|
-	 *			|				|			|
-	 * 			`---------------+-----------'
-	 *
-	 */
-
-#ifdef VERBOSE_STATIC_TESTS
-	cout << "Testing the network pass with an ambiguous cache load" << endl;
-#endif
-	
-	//FIXME: Test not ambiguous enough. Need to turn 0x2000 final before 0x2000 <-> 0x3000
-
-	const vector<BSDiffMoves> input = { {0 * BLOCK_SIZE, 100, 1 * BLOCK_SIZE},
-										{1 * BLOCK_SIZE, 100, 0 * BLOCK_SIZE},
-										{1 * BLOCK_SIZE, 100, 1 * BLOCK_SIZE + 100}};
-
-	const vector<Command> expected = {{REBASE, 0x0, 0x3},
-			//Exchange [0] and [1]
-			{USE_BLOCK, 0x1000},
-			{COPY, 0x1000, 0x64, 0x64, TMP_BUF},
-			{CHAINED_COPY, 0x1000, 0x800, 0x800},
-			{ERASE, 0x1000},
-			{RELEASE_BLOCK},
-			{COPY, 0x3000, 0x64, 0x64, 0x1000, 0x64},
-			{COPY, 0x0, 0x0, 0x800, 0x1000, 0x800},
-			{FLUSH_AND_PARTIAL_COMMIT, 0x0, 0x64},
-			{CHAINED_COPY, 0x1000, 0x64, 0x64},
-			{COPY, TMP_BUF, 0x64, 0x800, 0x0, 0x800},
-		
-			//Exchange [2] and [3]
-			{COPY, 0x2000, 0x1f4, 0x64, TMP_BUF},
-			{ERASE, 0x2000},
-			{COPY, 0x0, 0x64, 0x64, 0x2000, 0x64},
-			{CHAINED_COPY, 0x0, 0x0, 0x64},
-			{ERASE, 0x3000},
-			{COPY, TMP_BUF, 0x0, 0x64, 0x3000, 0x64},
-			{COPY, 0x0, 0x64, 0x50, 0x3000, 0x12c}};
-
-	vector<PublicCommand> output;
-	schedule(input, output);
-	return validateStaticResults(output, expected);
-}
-
 void performStaticTests()
 {
 	bool output = true;
@@ -799,7 +715,6 @@ void performStaticTests()
 	output &= forthPassTestWithCompetitiveRead();
 	output &= forthPassTestWithHarderCompetitiveRead();
 	output &= forthPassTestWithCompetitiveReadOnReusedSpace();
-	output &= forthPassTestWithAmbiguousCacheLoads();
 
 	if(output)
 	{
