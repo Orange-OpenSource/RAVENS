@@ -1,0 +1,14 @@
+{
+	"versions": [
+		{
+			"versionID" : 1,
+			"binary" : "test_files/v1.bin"
+		},
+		{
+			"versionID" : 2,
+			"binary" : "test_files/v2.bin"
+		}
+	],
+	"flashSizeBits" : 20,
+	"flashPageSizeBits" : 12
+}
