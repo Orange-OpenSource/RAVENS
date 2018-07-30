@@ -1,0 +1,12 @@
+[submodule "munin/mbedOS"]
+	path = munin/integration/mbedOS/mbed-os
+	url = https://github.com/ARMmbed/mbed-os.git
+[submodule "munin/mbedOS/network"]
+	path = munin/integration/mbedOS/network/easy-connect
+	url = https://github.com/ARMmbed/easy-connect.git
+[submodule "hugin/rapidJSON"]
+	path = hugin/thirdparty/rapidjson
+	url = https://github.com/Tencent/rapidjson.git
+[submodule "common/libHydrogen"]
+	path = common/crypto/libhydrogen
+	url = https://github.com/jedisct1/libhydrogen.git
