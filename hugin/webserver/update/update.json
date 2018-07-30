@@ -1,0 +1,18 @@
+{
+    "FactorioBot": {
+        "sign_util": "/home/taiki/uvisor_update/project/cmake-build-debug/hugin/hugin",
+        "currentVersion": 2,
+        "payload": {
+            "1": {
+                "manifest2": "/home/taiki/uvisor_update/project/zeus/update//FactorioBot/manifest2_1",
+                "verificationIndex": 142,
+                "manifest1": "/home/taiki/uvisor_update/project/zeus/update//FactorioBot/manifest1_1",
+                "verification": [
+                    "867d0e8021d7241570256510d08a5324f479bdf42b2b0352156ca9aae02afb99"
+                ],
+                "privateKey": "/home/taiki/uvisor_update/project/zeus/update//FactorioBot//priv_1",
+                "publicKey": "d553d1e7d31298629a3553977aab6dc1632dc23b6e48fd645554f5ebd2f5af70"
+            }
+        }
+    }
+}
