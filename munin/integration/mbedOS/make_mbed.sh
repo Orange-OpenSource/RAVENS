@@ -1,22 +1,22 @@
 #!/bin/sh
 
-rm -rf ../tmp
-mkdir -p ../tmp
-cd ../tmp
+rm -rf tmp
+mkdir -p tmp
+cd tmp
 
-cp -R ../project/common .
-cp -R ../project/munin/Bytecode .
-cp -R ../project/munin/Delta .
-cp -R ../project/munin/Userland .
-cp ../project/munin/*.c .
-cp ../project/munin/*.h .
+cp -R ../common .
+cp -R ../munin/Bytecode .
+cp -R ../munin/Delta .
+cp -R ../munin/Userland .
+cp ../munin/*.c .
+cp ../munin/*.h .
 
 #Copy integration code
-cp -R ../project/munin/integration/mbedOS/* .
-cp ../project/munin/integration/mbedOS/.mbed .
+cp -R ../munin/integration/mbedOS/* .
+cp ../munin/integration/mbedOS/.mbed .
 
 #Copy the drivers
-cp -R ../project/munin/integration/drivers/K64F/ .
+cp -R ../munin/integration/drivers/K64F/ .
 mv K64F/ device
 
 mv network/easy-connect* .
