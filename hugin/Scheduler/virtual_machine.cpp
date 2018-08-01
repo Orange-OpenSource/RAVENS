@@ -42,7 +42,7 @@ void writeFlash(uint8_t * flash, uint8_t * source, size_t length)
 
 void performCopy(uint8_t * flash, size_t flashLength, uint8_t * cache, size_t source, size_t length, size_t dest)
 {
-	assert(length < BLOCK_SIZE);	//Operations must fit within a block
+	assert((dest & BLOCK_OFFSET_MASK) + length <= BLOCK_SIZE);	//Operations must fit within a block
 
 	const bool mainIsCache = isCache(source);
 	const bool secIsCache = isCache(dest);
