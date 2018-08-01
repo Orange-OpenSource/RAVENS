@@ -49,7 +49,7 @@ struct Block
 	}
 
 	void compileBlock();
-	void crossRefsBlocks(vector<Block> & blocks);
+	static void crossRefsBlocks(vector<Block> & blocks);
 
 	bool operator<(const BlockID & b) const {	return blockID < b;	}
 	bool operator>(const BlockID & b) const {	return blockID > b;	}

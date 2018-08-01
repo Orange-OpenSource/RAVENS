@@ -360,6 +360,7 @@ public:
 #include "Token.h"
 #include "Block.h"
 #include "DetailedBlock.h"
+#include "VirtualMemory.h"
 #include "network.h"
 
 bool buildBlockVector(const vector<BSDiffMoves> & input, vector<Block> & output);

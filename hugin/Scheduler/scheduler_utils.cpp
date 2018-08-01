@@ -6,7 +6,6 @@
 #include <unordered_set>
 #include <queue>
 #include "scheduler.h"
-#include "DetailedBlock.h"
 
 namespace Scheduler
 {

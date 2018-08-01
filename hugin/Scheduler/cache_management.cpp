@@ -13,10 +13,9 @@ void extractSubSectionToLoad(const DetailedBlockMetadata & toExtract, CacheMemor
 		if(!curTmp.tagged)
 			continue;
 
-		size_t index = 0;
-		for(const auto & _segment : output)
+		for(size_t index = 0, outputLength = output.size(); index < outputLength; )
 		{
-			bool stop = false;
+			auto & _segment = output[index];
 
 			//Translate the segment
 			vector<DetailedBlockMetadata> translatedSegment;
@@ -25,7 +24,8 @@ void extractSubSectionToLoad(const DetailedBlockMetadata & toExtract, CacheMemor
 			else
 				virtualMemory.translateSegment(_segment.source, _segment.length, translatedSegment);
 
-			for(const auto & segment : translatedSegment)
+			bool didUntag = false;
+			for(auto & segment : translatedSegment)
 			{
 				// We're not tagging segments that are now in use. Might be a problem but would generate a ton of noise for _loadTaggedToTMP
 				if(curTmp.overlapWith(segment.source, segment.length))
@@ -42,16 +42,35 @@ void extractSubSectionToLoad(const DetailedBlockMetadata & toExtract, CacheMemor
 							output.emplace_back(DetailedBlockMetadata(curTmp.source + curTmp.length, segment.source.getAddress() + segment.length - (curTmp.source.getAddress() + curTmp.length)));
 					}
 
-					output.erase(output.begin() + index);
-					stop = true;
-					break;
+					segment.tagged = false;
+					didUntag = true;
 				}
+				else
+					segment.tagged = true;
 			}
 
-			if(stop)
-				break;
+			//If we removed sections of the segment, we must remove/fragment the output
+			if(didUntag)
+			{
+				auto original = _segment;
+				size_t length = 0;
 
-			index += 1;
+				output.erase(output.begin() + index);
+				outputLength -= 1;
+
+				for(const auto & translation : translatedSegment)
+				{
+					if(translation.tagged)
+					{
+						output.insert(output.begin() + index++, DetailedBlockMetadata(original.source + length, original.destination + length, translation.length, true));
+						outputLength += 1;
+					}
+
+					length += translation.length;
+				}
+			}
+			else
+				index += 1;
 		}
 	}
 }
@@ -60,15 +79,6 @@ void extractSubSectionToLoad(const DetailedBlockMetadata & toExtract, CacheMemor
 void VirtualMemory::_loadTaggedToTMP(const DetailedBlock & dataToLoad, SchedulerData & commands, bool noTranslation)
 {
 	CacheMemory tmpLayoutCopy = tmpLayout;
-	tmpLayoutCopy.trimUntagged(false);
-
-	//The last segment of the cache must have the same source and destination
-	if(!tmpLayoutCopy.segments.back().tagged)
-	{
-		auto & lastSegment = tmpLayoutCopy.segments.back();
-		lastSegment.source = lastSegment.destination;
-	}
-
 	commands.newTransaction();
 
 	for (const auto &realSegment : dataToLoad.segments)
@@ -112,6 +122,7 @@ void VirtualMemory::_loadTaggedToTMP(const DetailedBlock & dataToLoad, Scheduler
 				//We need to make room
 				while(tmpSegment->length < segment.length)
 				{
+					//This usually mean we don't have enough room in the cache, which is not supposed to be possible as our caller check for that. This assert is _big_ trouble, and probably means extractSubSectionToLoad is failing
 					assert((tmpSegment + 1) != tmpLayoutCopy.segments.end());
 
 					auto currentSegment = *tmpSegment, nextSegment = *(tmpSegment + 1);
@@ -120,9 +131,11 @@ void VirtualMemory::_loadTaggedToTMP(const DetailedBlock & dataToLoad, Scheduler
 					commands.insertCommand({COPY, nextSegment.destination, nextSegment.length, currentSegment.destination});
 
 					//Update the cache context
+					tmpSegment->source = nextSegment.source;
 					tmpSegment->length = nextSegment.length;
 					tmpSegment->tagged = true;
 					tmpSegment += 1;
+					tmpSegment->source = currentSegment.source + nextSegment.length;
 					tmpSegment->destination = currentSegment.destination + nextSegment.length;
 					tmpSegment->length = currentSegment.length;
 					tmpSegment->tagged = false;
@@ -268,6 +281,8 @@ void VirtualMemory::loadTaggedToTMP(const DetailedBlock & dataToLoad, SchedulerD
 {
 	if(!hasCache)
 		didComplexLoadInCache(CacheMemory());
+	else
+		tmpLayout.trimUntagged();
 
 #ifdef VERY_AGGRESSIVE_ASSERT
 	//We check if we have enough room in the cache to load our data

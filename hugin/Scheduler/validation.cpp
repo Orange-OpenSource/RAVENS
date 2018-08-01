@@ -18,6 +18,29 @@ using namespace std;
 #include "scheduler.h"
 #include <crypto.h>
 
+struct VerificationRangeCollector
+{
+	map<BlockID, DetailedBlock> data;
+
+	void tag(size_t address, size_t length)
+	{
+		if(length == 0)
+			return;
+
+		const size_t spaceLeftInTag = BLOCK_SIZE - (address & BLOCK_OFFSET_MASK);
+		const size_t lengthToTag = MIN(spaceLeftInTag, length);
+
+		BlockID blockID(address);
+		if(data.find(blockID) == data.end())
+			data[blockID].segments.emplace_back(blockID);
+
+		data[blockID].insertNewSegment(DetailedBlockMetadata(Address(address), lengthToTag, true));
+
+		if(lengthToTag < length)
+			tag(address + lengthToTag, length - lengthToTag);
+	}
+};
+
 uint8_t * generateVirtualFlash(size_t & flashLength)
 {
 	//Craft the virtual flash
@@ -93,18 +116,21 @@ bool validateSchedulerPatch(const uint8_t * original, size_t originalLength, con
 	return true;
 }
 
-void addReadRange(DetailedBlock & readRange, const DetailedBlock & writeRange, size_t baseAddress, size_t length)
+void addReadRange(VerificationRangeCollector & readRange, const VerificationRangeCollector & writeRange, size_t baseAddress, size_t realLength)
 {
 	Address address(baseAddress);
-	
-	if(!writeRange.segments.empty())
+	const size_t spaceLeftInTag = BLOCK_SIZE - (baseAddress & BLOCK_OFFSET_MASK);
+	size_t length = MIN(spaceLeftInTag, realLength);
+
+	auto blockRange = writeRange.data.find(address.getBlock());
+
+	if(blockRange != writeRange.data.end())
 	{
 		Address endBase(address + length);
+		const auto & segments = blockRange->second.segments;
 		
-		//FIXME: Very significant performance improvement should be possible by using a hashtable
-		auto wRange = lower_bound(writeRange.segments.begin(), writeRange.segments.end(), address, [](const DetailedBlockMetadata & meta, const Address & add) { return (meta.source + meta.length) < add; });
-		
-		for(; wRange != writeRange.segments.end(); ++wRange)
+		auto wRange = lower_bound(segments.begin(), segments.end(), address, [](const DetailedBlockMetadata & meta, const Address & add) { return (meta.source + meta.length) < add; });
+		for(; wRange != segments.end(); ++wRange)
 		{
 			if(!wRange->tagged)
 				continue;
@@ -168,14 +194,18 @@ void addReadRange(DetailedBlock & readRange, const DetailedBlock & writeRange, s
 	}
 
 	if(length != 0)
-		readRange.insertNewSegment(DetailedBlockMetadata(address, length, true));
+		readRange.tag(address.value, length);
+
+	//If we tried adding a range beyond the end of the block, we recursively call ourselves
+	if(spaceLeftInTag < realLength)
+		addReadRange(readRange, writeRange, baseAddress + spaceLeftInTag, realLength - spaceLeftInTag);
 }
 
 void generateVerificationRangesPrePatch(SchedulerPatch &patch, size_t initialOffset)
 {
 	//We need to collect all reads
 
-	DetailedBlock readRanges, writtenRanges;
+	VerificationRangeCollector readRanges, writtenRanges;
 	size_t endAddressCopy = 0;
 
 	//Most of them will come from the bytecode
@@ -188,19 +218,19 @@ void generateVerificationRangesPrePatch(SchedulerPatch &patch, size_t initialOff
 			case ERASE:
 			case COMMIT:
 			{
-				writtenRanges.insertNewSegment(DetailedBlockMetadata(Address(command.mainAddress), BLOCK_SIZE, true));
+				writtenRanges.tag(command.mainAddress, BLOCK_SIZE);
 				break;
 			}
 			case FLUSH_AND_PARTIAL_COMMIT:
 			{
-				writtenRanges.insertNewSegment(DetailedBlockMetadata(Address(command.mainAddress), command.length, true));
+				writtenRanges.tag(command.mainAddress, command.length);
 				break;
 			}
 
 			case LOAD_AND_FLUSH:
 			{
 				addReadRange(readRanges, writtenRanges, command.mainAddress, command.length);
-				writtenRanges.insertNewSegment(DetailedBlockMetadata(Address(command.mainAddress), BLOCK_SIZE, true));
+				writtenRanges.tag(command.mainAddress, BLOCK_SIZE);
 				break;
 			}
 
@@ -210,7 +240,7 @@ void generateVerificationRangesPrePatch(SchedulerPatch &patch, size_t initialOff
 					addReadRange(readRanges, writtenRanges, command.mainAddress, command.length);
 
 				if(!isCache(command.secondaryAddress))
-					writtenRanges.insertNewSegment(DetailedBlockMetadata(Address(command.secondaryAddress), command.length, true));
+					writtenRanges.tag(command.secondaryAddress, command.length);
 
 				endAddressCopy = command.secondaryAddress + command.length;
 
@@ -222,7 +252,7 @@ void generateVerificationRangesPrePatch(SchedulerPatch &patch, size_t initialOff
 					addReadRange(readRanges, writtenRanges, command.mainAddress, command.length);
 
 				if(!isCache(endAddressCopy))
-					writtenRanges.insertNewSegment(DetailedBlockMetadata(Address(endAddressCopy), command.length, true));
+					writtenRanges.tag(endAddressCopy, command.length);
 
 				endAddressCopy += command.length;
 				break;
@@ -262,24 +292,29 @@ void generateVerificationRangesPrePatch(SchedulerPatch &patch, size_t initialOff
 	}
 
 	//Compact, then add to the oldRange vector in small enough chunks
-	readRanges.compactSegments();
-	for(const auto & segment : readRanges.segments)
+
+	for(auto & readRange : readRanges.data)
 	{
-		if(segment.tagged)
+		readRange.second.compactSegments();
+		for(const auto & segment : readRange.second.segments)
 		{
-			size_t patchLength = segment.length;
-			initialOffset = segment.source.getAddress();
-
-			while(patchLength)
+			if(segment.tagged)
 			{
-				const uint16_t rangeLength = (uint16_t) (patchLength > VerificationRange::maxLength ? VerificationRange::maxLength : patchLength);
+				size_t patchLength = segment.length;
+				initialOffset = segment.source.getAddress();
 
-				patch.oldRanges.emplace_back(VerificationRange(static_cast<uint32_t>(initialOffset), static_cast<uint16_t>(rangeLength - 1)));
+				while(patchLength)
+				{
+					const uint16_t rangeLength = (uint16_t) (patchLength > VerificationRange::maxLength ? VerificationRange::maxLength : patchLength);
 
-				patchLength -= rangeLength;
-				initialOffset += rangeLength;
+					patch.oldRanges.emplace_back(VerificationRange(static_cast<uint32_t>(initialOffset), static_cast<uint16_t>(rangeLength - 1)));
+
+					patchLength -= rangeLength;
+					initialOffset += rangeLength;
+				}
 			}
 		}
+
 	}
 }
 

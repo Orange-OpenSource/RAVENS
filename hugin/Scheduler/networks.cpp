@@ -162,72 +162,100 @@ vector<BlockID> NetworkNode::tookOverNode(const NetworkNode & pulledNode, bool b
 
 bool NetworkNode::dispatchInNodes(NetworkNode & node1, NetworkNode & node2)
 {
-	size_t lengthToAllocate = getOccupationLevel(), counter = 0;
+	size_t lengthToAllocate = getOccupationLevel();
 	vector<pair<size_t, size_t>> spaceLeftAfterward;
+	bool needReloop, didReloopOnce = false;
+	BlockID reloopSource(TMP_BUF), reloopDest(TMP_BUF);
 
 	assert(lengthToAllocate <= 2 * BLOCK_SIZE);
 
-	for(char i = 0; i < 2; ++i)
+	do
 	{
-		//Sort the token to dispatch
-		sort(tokens.begin(), tokens.end(), [](const NetworkToken & a, const NetworkToken & b) { return a.length > b.length; });
+		needReloop = false;
 
-		auto &node = i == 0 ? node1 : node2;
-
-		const size_t nodeCurrentOccupation = node.getOccupationLevel();
-		size_t spaceLeft = BLOCK_SIZE - nodeCurrentOccupation;
-
-		assert(nodeCurrentOccupation <= BLOCK_SIZE);
-
-		for(auto iter = tokens.begin(); iter != tokens.end() && spaceLeft;)
+		//We allocate our tokens in the two nodes, while making sure we don't overload them
+		for(char counter = 0; counter < 2; ++counter)
 		{
-			if(iter->length <= spaceLeft)
+			//Sort the token to dispatch, as removeOverlapWithToken may have reduced some's length
+			sort(tokens.begin(), tokens.end(), [](const NetworkToken & a, const NetworkToken & b) { return a.length > b.length; });
+
+			auto &node = counter == 0 ? node1 : node2;
+
+			const size_t nodeCurrentOccupation = node.getOccupationLevel();
+			size_t spaceLeft = BLOCK_SIZE - nodeCurrentOccupation;
+
+			assert(nodeCurrentOccupation <= BLOCK_SIZE);
+
+			for(auto iter = tokens.begin(); iter != tokens.end() && spaceLeft;)
 			{
-				NetworkToken tokenMoved = *iter;
-				tokens.erase(iter);
-				removeOverlapWithToken({tokenMoved});
+				if(iter->length <= spaceLeft)
+				{
+					NetworkToken tokenMoved = *iter;
+					tokens.erase(iter);
+					removeOverlapWithToken({tokenMoved});
 
 #ifdef VERY_AGGRESSIVE_ASSERT
-				//Validate the length of the token
-				size_t tokenLength = 0;
-				for(const auto & subToken : tokenMoved.sourceToken)
-					tokenLength += subToken.length;
-				assert(tokenLength == tokenMoved.length);
+					//Validate the length of the token
+					size_t tokenLength = 0;
+					for(const auto & subToken : tokenMoved.sourceToken)
+						tokenLength += subToken.length;
+					assert(tokenLength == tokenMoved.length);
 #endif
 
-				//Merge the token to the NetworkNode
-				tokenMoved.sourceBlockID = node.block;
-				node.appendToken(tokenMoved);
+					//Merge the token to the NetworkNode
+					tokenMoved.sourceBlockID = node.block;
+					node.appendToken(tokenMoved);
 
-				//Update the space
-				assert(tokenMoved.length <= spaceLeft);
-				assert(tokenMoved.length <= lengthToAllocate);
+					//Update the space
+					assert(tokenMoved.length <= spaceLeft);
+					assert(tokenMoved.length <= lengthToAllocate);
 
-				spaceLeft -= tokenMoved.length;
-				lengthToAllocate -= tokenMoved.length;
+					spaceLeft -= tokenMoved.length;
+					lengthToAllocate -= tokenMoved.length;
+				}
+				else
+					iter += 1;
 			}
-			else
-				iter += 1;
+
+			assert(lengthToAllocate == getOccupationLevel());
+			spaceLeftAfterward.emplace_back(spaceLeft, counter);
 		}
 
-		assert(lengthToAllocate == getOccupationLevel());
-		spaceLeftAfterward.emplace_back(spaceLeft, counter++);
-	}
+		//We may, due to duplicates, have too many nodes left (several huge tokens that heavily overlap but not completely)
+		// If we fear we may be in this scenario, we need to run the loop once more after `removeOverlapWithToken` with the first token
+		if(tokens.size() > 1)
+		{
+			const auto frontToken = tokens.front();
+
+			//We don't infinitely loop. If we already triggered a reloop for the same front token, we let it go
+			if(!didReloopOnce || (reloopSource != frontToken.sourceBlockID || reloopDest != frontToken.destinationBlockID))
+			{
+				didReloopOnce = true;
+				reloopSource = frontToken.sourceBlockID;
+				reloopDest = frontToken.destinationBlockID;
+
+				//Remove the token before calling removeOverlapWithToken
+				tokens.erase(tokens.begin());
+				removeOverlapWithToken({frontToken});
+
+				//Insert it back at the beginning
+				tokens.insert(tokens.begin(), frontToken);
+
+				if(tokens.size() > 1)
+				{
+					needReloop = true;
+					spaceLeftAfterward.clear();
+				}
+			}
+		}
+
+	} while(needReloop);
 
 	bool needDivide = lengthToAllocate != 0;
 	if(needDivide)
 	{
-		assert(!tokens.empty());
+		assert(tokens.size() == 1);
 		auto firstToken = tokens.front();
-
-		if(tokens.size() > 1)
-		{
-			tokens.erase(tokens.begin());
-			removeOverlapWithToken({firstToken});
-
-			//We can't have more than a single token left
-			assert(tokens.empty());
-		}
 
 		//We keep the block we divided in superNode so the caller can figure what happened
 		//We try to cut the data left in as few chunks as possible
@@ -237,6 +265,7 @@ bool NetworkNode::dispatchInNodes(NetworkNode & node1, NetworkNode & node2)
 		{
 			const size_t lengthToCopy = MIN(spaceLeft.first, lengthToAllocate);
 			NetworkToken subSequence = firstToken.extractSubsequence(lengthToCopy);
+			firstToken.removeOverlapWith({subSequence});
 
 			if(spaceLeft.second == 0)
 			{
@@ -404,12 +433,19 @@ NetworkToken Network::findLargestToken()
 	NetworkToken & outputToken = invalidToken;
 	int64_t maxToken = INT64_MIN;
 
-	for(const auto & node : nodes)
+	for(auto & node : nodes)
 	{
 		//If the node has no outgoing data, there is no outgoing link.
 		//If the node is final, its data could be pulled whenever the receiving node turn final
 		if(node.nbSourcesOut == 0 || node.isFinal)
 			continue;
+
+		//Does the need need an update?
+		if(node.needRefreshLargestToken)
+		{
+			node.refreshLargestToken([&](const NetworkToken & token) { return computeLinkWeigth(token); });
+			node.needRefreshLargestToken = false;
+		}
 
 		if(node.tokens.size() <= node.largestToken)
 			continue;
@@ -435,7 +471,8 @@ NetworkToken Network::findLargestToken()
 				bonus = 3;
 		}
 
-		const auto linkWeight = computeLinkWeigth(token) + bonus;
+		//We need to find a way to cache that
+		const auto linkWeight = node.largestTokenWeight + bonus;
 		if(linkWeight > maxToken)
 		{
 			outputToken = token;
@@ -762,18 +799,17 @@ bool Network::performBestSwap(SchedulerData & schedulerData)
 		//Refresh largest links if they impacted the links we updated
 		for(auto & node : nodes)
 		{
-			if(!node.isFinal && node.block != source.block && node.block != destination.block)
+			if(!node.isFinal && !node.needRefreshLargestToken && node.block != source.block && node.block != destination.block)
 			{
+				//Mark the node as asking for an update
 				auto & token = node.tokens[node.largestToken];
-				if(node.needRefreshLargestToken || token.cleared ||
-				   token.destinationBlockID == source.block || token.destinationBlockID == destination.block)
+				if(token.cleared || token.destinationBlockID == source.block || token.destinationBlockID == destination.block)
 				{
-					node.refreshLargestToken([&](const NetworkToken & token) { return computeLinkWeigth(token); });
-					node.needRefreshLargestToken = false;
+					node.needRefreshLargestToken = true;
 				}
 
 #ifdef VERY_AGGRESSIVE_ASSERT
-				if(token.destinationBlockID == token.sourceBlockID && node.tokens.size() > 1)
+				else if(token.destinationBlockID == token.sourceBlockID && node.tokens.size() > 1)
 					assert(token.destinationBlockID != token.sourceBlockID);
 #endif
 			}

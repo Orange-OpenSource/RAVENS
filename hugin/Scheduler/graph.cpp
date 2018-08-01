@@ -45,8 +45,7 @@ bool buildBlockVector(const vector<BSDiffMoves> & input, vector<Block> & output)
 	if(!output.empty())
 		output.back().compileBlock();
 
-	for(auto & block : output)
-		block.crossRefsBlocks(output);
+	Block::crossRefsBlocks(output);
 
 	return !output.empty();
 }
@@ -94,16 +93,17 @@ void Block::compileBlock()
 
 void Block::crossRefsBlocks(vector<Block> & blocks)
 {
+	unordered_map<BlockID, vector<BlockLink>> crossRef;
+	crossRef.reserve(blocks.size());
+
 	for(const auto & block : blocks)
 	{
-		//We ignore ourselves
-		if(block.blockID == blockID)
-			continue;
+		for(const auto & ref : block.blocksWithDataForCurrent)
+			crossRef[ref.block].emplace_back(BlockLink(block.blockID, ref.volume));
+	}
 
-		//BlockIDs are sorted
-		auto iter = lower_bound(block.blocksWithDataForCurrent.begin(), block.blocksWithDataForCurrent.end(), blockID, [](const BlockLink & a, const BlockID & b) { return a.block < b; });
-
-		if(iter != block.blocksWithDataForCurrent.end() && iter->block == blockID)
-			blocksRequestingData.emplace_back(BlockLink(block.blockID, iter->volume));
+	for(auto & block : blocks)
+	{
+		block.blocksRequestingData = crossRef[block.blockID];
 	}
 }

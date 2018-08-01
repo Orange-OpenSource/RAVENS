@@ -5,6 +5,7 @@
 #ifndef HERMES_NETWORK_H
 #define HERMES_NETWORK_H
 
+#include <functional>
 #include <unordered_set>
 #include <unordered_map>
 
@@ -23,6 +24,7 @@ struct NetworkNode
 #endif
 
 	size_t largestToken;
+	int64_t largestTokenWeight;
 	bool isFinal;
 	bool needRefreshLargestToken;
 
@@ -31,6 +33,7 @@ struct NetworkNode
 	,touchCount(0)
 #endif
 	{
+		//FIXME: Current performance bottleneck
 		for(const auto & token : allTokens)
 			appendToken(token);
 
@@ -46,15 +49,15 @@ struct NetworkNode
 		if(nbSourcesOut != 0)
 		{
 			size_t counter = 0;
-			int64_t maxLength = INT64_MIN;
+			largestTokenWeight = INT64_MIN;
 			for(const auto & token : tokens)
 			{
 				if(token.destinationBlockID != block)
 				{
 					const int64_t tokenWeight = lambda(token);
-					if(tokenWeight > maxLength)
+					if(tokenWeight > largestTokenWeight)
 					{
-						maxLength = tokenWeight;
+						largestTokenWeight = tokenWeight;
 						largestToken = counter;
 					}
 				}
@@ -93,11 +96,24 @@ struct NetworkNode
 			else
 				appendFinalToken(token);
 
-			//buildNetworkTokenArray merge any duplicates
+			//buildNetworkTokenArray merge any duplicates, unless dispatchInNodes split then unsplit a token
+			bool foundExisting = false;
 			for(auto & existingToken : tokens)
-				assert(existingToken.destinationBlockID != token.destinationBlockID);
+			{
+				if(existingToken.destinationBlockID == token.destinationBlockID)
+				{
+					//Remove overlap, then merge the tokens
+					existingToken.removeOverlapWith({token});
+					existingToken.sourceToken.insert(existingToken.sourceToken.end(), token.sourceToken.begin(), token.sourceToken.end());
+					existingToken.length += token.length;
 
-			tokens.insert(lower_bound(tokens.begin(), tokens.end(), token), token);
+					foundExisting = true;
+					break;
+				}
+			}
+
+			if(!foundExisting)
+				tokens.insert(lower_bound(tokens.begin(), tokens.end(), token), token);
 		}
 		else if(token.destinationBlockID == block)
 		{
@@ -208,15 +224,15 @@ struct NetworkNode
 
 		bool foundCore = false;
 		NetworkToken dummyToken = NetworkToken(Token(Address(block, 0), finalLength, Address(block, 0)));
-		NetworkToken & selfToken = dummyToken;
+		auto selfToken = ref(dummyToken);
 
 		//Find the token containing our data
 		for(auto & token : tokens)
 		{
 			if(token.destinationBlockID == block)
 			{
-				selfToken = token;
-				selfToken.length = finalLength;
+				selfToken = ref(token);
+				selfToken.get().length = finalLength;
 				foundCore = true;
 				break;
 			}
@@ -224,7 +240,7 @@ struct NetworkNode
 
 		//If no real token, we remove the dummy placeholder
 		if(!foundCore)
-			selfToken.sourceToken.clear();
+			selfToken.get().sourceToken.clear();
 
 		//Write the final tokens to the self token, from our final layout
 		for(const auto & token : blockFinalLayout.segments)
@@ -232,7 +248,7 @@ struct NetworkNode
 			if(token.tagged && token.source == block)
 			{
 				bool tokenAlreadyThere = false;
-				for(const Token & existingToken : selfToken.sourceToken)
+				for(const Token & existingToken : selfToken.get().sourceToken)
 				{
 					if(existingToken.finalAddress == token.destination)
 					{
@@ -243,7 +259,7 @@ struct NetworkNode
 
 				//Insert the token if the data isn't already there
 				if(!tokenAlreadyThere)
-					selfToken.sourceToken.emplace_back(Token(token.destination, token.length, token.source));
+					selfToken.get().sourceToken.emplace_back(Token(token.destination, token.length, token.source));
 			}
 		}
 
