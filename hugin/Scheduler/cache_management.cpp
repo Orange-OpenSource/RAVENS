@@ -4,7 +4,7 @@
 
 #include "scheduler.h"
 
-void extractSubSectionToLoad(const DetailedBlockMetadata & toExtract, CacheMemory & cache, VirtualMemory & virtualMemory, bool noTranslation, vector<DetailedBlockMetadata> & output)
+void extractSubSectionToLoad(const DetailedBlockMetadata & toExtract, const CacheMemory & cache, const VirtualMemory & virtualMemory, bool noTranslation, vector<DetailedBlockMetadata> & output)
 {
 	output.emplace_back(toExtract);
 
@@ -15,14 +15,14 @@ void extractSubSectionToLoad(const DetailedBlockMetadata & toExtract, CacheMemor
 
 		for(size_t index = 0, outputLength = output.size(); index < outputLength; )
 		{
-			auto & _segment = output[index];
+			auto & originalSegment = output[index];
 
 			//Translate the segment
 			vector<DetailedBlockMetadata> translatedSegment;
 			if(noTranslation)
-				translatedSegment.emplace_back(_segment);
+				translatedSegment.emplace_back(originalSegment);
 			else
-				virtualMemory.translateSegment(_segment.source, _segment.length, translatedSegment);
+				virtualMemory.translateSegment(originalSegment.source, originalSegment.length, translatedSegment);
 
 			bool didUntag = false;
 			for(auto & segment : translatedSegment)
@@ -31,13 +31,13 @@ void extractSubSectionToLoad(const DetailedBlockMetadata & toExtract, CacheMemor
 				if(curTmp.overlapWith(segment.source, segment.length))
 				{
 					//Partial overlap?
-					if (curTmp.source > segment.source || curTmp.source + curTmp.length < segment.source + segment.length)
+					if(curTmp.source > segment.source || curTmp.source + curTmp.length < segment.source + segment.length)
 					{
-						//We're starting before
+						//We're starting before, so we add back the segment before the match
 						if(segment.source < curTmp.source)
 							output.emplace_back(DetailedBlockMetadata(_segment.source, curTmp.source.getAddress() - segment.source.getAddress()));
 
-						//We're finishing after
+						//We're finishing after, so we add the segment after the match
 						if(segment.source + segment.length > curTmp.source + curTmp.length)
 							output.emplace_back(DetailedBlockMetadata(curTmp.source + curTmp.length, segment.source.getAddress() + segment.length - (curTmp.source.getAddress() + curTmp.length)));
 					}
@@ -52,7 +52,7 @@ void extractSubSectionToLoad(const DetailedBlockMetadata & toExtract, CacheMemor
 			//If we removed sections of the segment, we must remove/fragment the output
 			if(didUntag)
 			{
-				auto original = _segment;
+				auto original = originalSegment;
 				size_t length = 0;
 
 				output.erase(output.begin() + index);
@@ -68,6 +68,9 @@ void extractSubSectionToLoad(const DetailedBlockMetadata & toExtract, CacheMemor
 
 					length += translation.length;
 				}
+
+				if(outputLength == 0)
+					return;
 			}
 			else
 				index += 1;

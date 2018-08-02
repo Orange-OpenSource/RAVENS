@@ -10,8 +10,6 @@
 #include <algorithm>
 #include <functional>
 
-#include "scheduler.h"
-
 struct CacheMemory : public DetailedBlock
 {
 	CacheMemory() : DetailedBlock(TMP_BUF) {}
