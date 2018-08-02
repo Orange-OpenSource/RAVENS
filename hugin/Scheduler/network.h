@@ -28,14 +28,48 @@ struct NetworkNode
 	bool isFinal;
 	bool needRefreshLargestToken;
 
-	NetworkNode(const BlockID & currentBlock, const vector<NetworkToken> & allTokens) : block(currentBlock), sumOut(0), nbSourcesIn(0), nbSourcesOut(0), lengthFinalLayout(0), blockFinalLayout(currentBlock), largestToken(0), needRefreshLargestToken(false), isFinal(false)
+	NetworkNode(const BlockID & curBlockID, const vector<NetworkToken> & allTokens) : block(curBlockID), sumOut(0), nbSourcesIn(0), nbSourcesOut(0), lengthFinalLayout(0), blockFinalLayout(curBlockID), largestToken(0), needRefreshLargestToken(false), isFinal(false)
+	{
+		//Very expensive,
+		for(const auto & token : allTokens)
+			appendToken(token);
+
+#ifdef VERY_AGGRESSIVE_ASSERT
+		assert(getOccupationLevel() <= BLOCK_SIZE);
+#endif
+	}
+
+	NetworkNode(const Block & curBlock, const vector<NetworkToken> & allTokens) : block(curBlock.blockID), sumOut(0), nbSourcesIn(0), nbSourcesOut(0), lengthFinalLayout(0), blockFinalLayout(curBlock.blockID), largestToken(0), needRefreshLargestToken(false), isFinal(false)
 #ifdef PRINT_SELECTED_LINKS
 	,touchCount(0)
 #endif
 	{
-		//FIXME: Current performance bottleneck
-		for(const auto & token : allTokens)
-			appendToken(token);
+		//We first import sourceID matches, allTokens are sorted by sourceID
+		auto startSourceID = lower_bound(allTokens.cbegin(), allTokens.cend(), block, [](const NetworkToken & a, const BlockID & b) { return a.sourceBlockID < b; });
+		while(startSourceID != allTokens.cend() && startSourceID->sourceBlockID == block)
+		{
+			appendToken(*startSourceID);
+			startSourceID += 1;
+		}
+
+		//We're then interested in NetworkToken for which we are destinationID.
+		//	In order to detect them, we look at our Block and search for NetworkToken coming from blocks in our curBlock.blocksWithDataForCurrent
+		for(const auto & link : curBlock.blocksWithDataForCurrent)
+		{
+			if(link.block == block)
+				continue;
+
+			auto startDestID = lower_bound(allTokens.cbegin(), allTokens.cend(), link.block, [](const NetworkToken & a, const BlockID & b) { return a.sourceBlockID < b; });
+			while(startDestID != allTokens.cend() && startDestID->sourceBlockID == link.block)
+			{
+				//Found our match!
+				if(startDestID->destinationBlockID == block)
+					appendToken(*startDestID);
+
+				startDestID += 1;
+			}
+
+		}
 
 #ifdef VERY_AGGRESSIVE_ASSERT
 		assert(getOccupationLevel() <= BLOCK_SIZE);
@@ -304,7 +338,7 @@ public:
 		size_t counter = 0;
 		for(const size_t & blockIndex : network)
 		{
-			nodes.emplace_back(blocks[blockIndex].blockID, tokens);
+			nodes.emplace_back(blocks[blockIndex], tokens);
 			nodeIndex.emplace(blocks[blockIndex].blockID, counter++);
 		}
 

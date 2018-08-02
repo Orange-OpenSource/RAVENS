@@ -291,14 +291,32 @@ void generateVerificationRangesPrePatch(SchedulerPatch &patch, size_t initialOff
 		addReadRange(readRanges, writtenRanges, initialOffset, aditionnalLengthToCheck);
 	}
 
-	//Compact, then add to the oldRange vector in small enough chunks
-
+	//Compact, then add to the oldRange vector in small enough chunks. We start by counting the space we need to allocate in oldRanges
+	size_t lengthToAllocate = 0;
 	for(auto & readRange : readRanges.data)
 	{
 		readRange.second.compactSegments();
-		for(const auto & segment : readRange.second.segments)
+		for (const auto &segment : readRange.second.segments)
 		{
-			if(segment.tagged)
+			if (segment.tagged)
+			{
+				if (segment.length > VerificationRange::maxLength)
+					lengthToAllocate += segment.length / VerificationRange::maxLength + segment.length % VerificationRange::maxLength;
+				else
+					lengthToAllocate += 1;
+			}
+		}
+	}
+
+	//Grab the memory
+	patch.oldRanges.reserve(lengthToAllocate);
+
+	//Actually fill the data in the buffer
+	for(auto & readRange : readRanges.data)
+	{
+		for (const auto &segment : readRange.second.segments)
+		{
+			if (segment.tagged)
 			{
 				size_t patchLength = segment.length;
 				initialOffset = segment.source.getAddress();
