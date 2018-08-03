@@ -45,10 +45,8 @@ struct Address
 	operator BlockID() const {	return getBlock();	}
 	explicit operator size_t() const {	return getOffset();	}
 
-	Address operator+(size_t b) const
-	{
-		return Address(value + b);
-	}
+	Address operator+(size_t b) const 	{	return Address(value + b); }
+	Address operator+(int64_t b) const	{	return Address(value + b); }
 
 	void operator+=(size_t b)
 	{

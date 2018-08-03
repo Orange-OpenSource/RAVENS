@@ -216,7 +216,7 @@ struct TranslationTable
 #endif
 				const size_t lengthLeft = iter->length - (from.getAddress() - iter->destination.getAddress());
 				const size_t lengthToCopy = MIN(lengthLeft, length);
-				const size_t shiftToReal = iter->source.getAddress() - iter->destination.getAddress();
+				const int64_t shiftToReal = iter->source.getAddress() - iter->destination.getAddress();
 				Address shiftedFrom(from + shiftToReal);
 
 				const bool needIgnoreCache = needToSkipCache(shiftedFrom, from, lengthToCopy);
