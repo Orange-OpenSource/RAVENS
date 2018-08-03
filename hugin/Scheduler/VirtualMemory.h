@@ -291,9 +291,7 @@ struct VirtualMemory : public DetailedBlock
 	CacheMemory tmpLayout;
 
 	bool hasCachedWrite;
-	bool dumbCacheCommit;
 	bool cachedWriteIgnoreLayout;
-	size_t dumbCacheCommitLength;
 	BlockID cachedWriteBlock;
 	DetailedBlock cachedWriteRequest;
 
@@ -567,22 +565,6 @@ struct VirtualMemory : public DetailedBlock
 		cachedWriteBlock = block;
 		cachedWriteRequest = writes;
 		hasCachedWrite = true;
-		dumbCacheCommit = false;
-#ifndef AVOID_UNECESSARY_REWRITE
-		commitCachedWrite(commands);
-#endif
-	}
-
-	void cacheBasicCacheWrite(const BlockID block, size_t length, SchedulerData & commands)
-	{
-		if(hasCachedWrite)
-			commitCachedWrite(commands);
-
-		hasCachedWrite = true;
-		dumbCacheCommit = true;
-		cachedWriteBlock = block;
-		dumbCacheCommitLength = length;
-
 #ifndef AVOID_UNECESSARY_REWRITE
 		commitCachedWrite(commands);
 #endif
@@ -592,17 +574,7 @@ struct VirtualMemory : public DetailedBlock
 	{
 		if(hasCachedWrite)
 		{
-			if(dumbCacheCommit)
-			{
-				commands.insertCommand({COPY, TMP_BUF, 0, dumbCacheCommitLength, cachedWriteBlock, 0});
-				redirect(tmpLayout, cachedWriteBlock);
-				tmpLayout.untagAll();
-			}
-			else
-			{
-				writeTaggedToBlock(cachedWriteBlock, cachedWriteRequest, commands, cachedWriteIgnoreLayout);
-			}
-
+			writeTaggedToBlock(cachedWriteBlock, cachedWriteRequest, commands, cachedWriteIgnoreLayout);
 			hasCachedWrite = false;
 
 			performRedirect();

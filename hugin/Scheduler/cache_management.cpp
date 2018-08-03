@@ -78,6 +78,56 @@ void extractSubSectionToLoad(const DetailedBlockMetadata & toExtract, const Cach
 	}
 }
 
+void buildWriteCommandToFlushCacheFromNodes(const vector<NetworkNode> & nodes, const VirtualMemory & virtualMemory, const BlockID & destination, DetailedBlock & commands)
+{
+#error "Finish implementation"
+
+	//We need to get the virtual addresses of all physical addresses currently loaded into the cache
+	DetailedBlock reverseTranslation;
+	for(const auto & node : nodes)
+	{
+		//Insert the raw block
+		reverseTranslation.insertNewSegment(DetailedBlockMetadata(node.block, BLOCK_SIZE));
+
+		for(const auto & token : node.tokens)
+		{
+			if(token.cleared)
+				continue;
+
+			for(const auto & segment : token.sourceToken)
+			{
+				vector<DetailedBlockMetadata> sectionNotPresent;
+				extractSubSectionToLoad(segment, virtualMemory.tmpLayout, virtualMemory, false, sectionNotPresent);
+
+				sort(sectionNotPresent.begin(), sectionNotPresent.end(), [](const DetailedBlockMetadata & a, const DetailedBlockMetadata & b)
+				{
+					return a.source.value < b.source.value;
+				});
+
+				Address baseSegment = segment.origin;
+				size_t length = segment.length;
+
+				for(const auto & section : sectionNotPresent)
+				{
+					if(baseSegment.value < section.source.value)
+					{
+
+					}
+				}
+
+				//We add to the commands the full token
+				vector<DetailedBlockMetadata> translations;
+				virtualMemory.translateSegment(segment.origin, segment.length, translations);
+
+				for(const auto & translation : translations)
+				{
+					commands.insertNewSegment()
+				}
+			}
+		}
+	}
+}
+
 #ifdef TMP_STRATEGY_PROGRESSIVE
 void VirtualMemory::_loadTaggedToTMP(const DetailedBlock & dataToLoad, SchedulerData & commands, bool noTranslation)
 {

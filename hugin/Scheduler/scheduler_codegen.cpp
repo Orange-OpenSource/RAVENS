@@ -86,12 +86,12 @@ void Scheduler::halfSwapCodeGeneration(NetworkNode & firstNode, NetworkNode & se
 		}
 		else
 		{
-			//Is the cache fully in use? If not, the last segment is merely padding and not useful
-			const auto & lastSegment = memoryLayout.tmpLayout.segments.back();
-			size_t finalOffset = lastSegment.tagged ? lastSegment.getFinalDestOffset() : lastSegment.destination.getOffset();
+			//This is tricky, we need to look in the cache to get all the virtual addresses currently loaded.
+			//	Then, we build a DetailedBlock and use it to write the block
 
-			//Write a big chunk of cache in the page
-			memoryLayout.cacheBasicCacheWrite(block, finalOffset, commands);
+			DetailedBlock writeCommands(block);
+			buildWriteCommandToFlushCacheFromNodes({firstNode, secNode}, memoryLayout, block, writeCommands);
+			memoryLayout.writeTaggedToBlock(block, writeCommands, commands);
 		}
 
 	}, [&](bool didReverse)
