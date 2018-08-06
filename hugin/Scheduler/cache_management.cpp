@@ -25,6 +25,7 @@ void extractSubSectionToLoad(const DetailedBlockMetadata & toExtract, const Cach
 				virtualMemory.translateSegment(originalSegment.source, originalSegment.length, translatedSegment);
 
 			bool didUntag = false;
+			size_t translationLength = 0;
 			for(auto & segment : translatedSegment)
 			{
 				// We're not tagging segments that are now in use. Might be a problem but would generate a ton of noise for _loadTaggedToTMP
@@ -35,11 +36,15 @@ void extractSubSectionToLoad(const DetailedBlockMetadata & toExtract, const Cach
 					{
 						//We're starting before, so we add back the segment before the match
 						if(segment.source < curTmp.source)
-							output.emplace_back(DetailedBlockMetadata(output[index].source, curTmp.source.getAddress() - segment.source.getAddress()));
+							output.emplace_back(DetailedBlockMetadata(output[index].source + translationLength, curTmp.source.getAddress() - segment.source.getAddress()));
 
 						//We're finishing after, so we add the segment after the match
 						if(segment.source + segment.length > curTmp.source + curTmp.length)
-							output.emplace_back(DetailedBlockMetadata(curTmp.source + curTmp.length, segment.source.getAddress() + segment.length - (curTmp.source.getAddress() + curTmp.length)));
+						{
+							const size_t offsetCacheEndToTranslation = (curTmp.source.value + curTmp.length) - segment.source.value;
+							output.emplace_back(DetailedBlockMetadata(output[index].source + translationLength + offsetCacheEndToTranslation,
+																	  segment.source.value + segment.length - (curTmp.source.value + curTmp.length)));
+						}
 					}
 
 					segment.tagged = false;
@@ -47,6 +52,8 @@ void extractSubSectionToLoad(const DetailedBlockMetadata & toExtract, const Cach
 				}
 				else
 					segment.tagged = true;
+
+				translationLength += segment.length;
 			}
 
 			//If we removed sections of the segment, we must remove/fragment the output
