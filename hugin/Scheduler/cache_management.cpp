@@ -36,7 +36,10 @@ void extractSubSectionToLoad(const DetailedBlockMetadata & toExtract, const Cach
 					{
 						//We're starting before, so we add back the segment before the match
 						if(segment.source < curTmp.source)
+						{
 							output.emplace_back(DetailedBlockMetadata(output[index].source + translationLength, curTmp.source.getAddress() - segment.source.getAddress()));
+							outputLength += 1;
+						}
 
 						//We're finishing after, so we add the segment after the match
 						if(segment.source + segment.length > curTmp.source + curTmp.length)
@@ -44,6 +47,7 @@ void extractSubSectionToLoad(const DetailedBlockMetadata & toExtract, const Cach
 							const size_t offsetCacheEndToTranslation = (curTmp.source.value + curTmp.length) - segment.source.value;
 							output.emplace_back(DetailedBlockMetadata(output[index].source + translationLength + offsetCacheEndToTranslation,
 																	  segment.source.value + segment.length - (curTmp.source.value + curTmp.length)));
+							outputLength += 1;
 						}
 					}
 
