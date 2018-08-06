@@ -729,12 +729,7 @@ bool Network::performBestSwap(SchedulerData & schedulerData)
 	}
 #endif
 
-	//In theory, this kind of link shouldn't ever be selected
-	//It could be dealt with fairly easily with the following code but imply no external reference is left
-	//	Might be a problem with competitive use of data
-	//			schedulerData.insertCommand({LOAD_AND_FLUSH, bestToken.sourceBlockID});
-	//			memoryLayout.didSimpleLoadInCache(bestToken.sourceBlockID);
-	//			memoryLayout.writeBlock(source.block, source.blockFinalLayout, schedulerData);
+	//Those links are explicitely forbidden, as pullDataToNode take care of nodes whose the only link left is this one
 	assert(bestToken.sourceBlockID != bestToken.destinationBlockID);
 
 	NetworkNode & source = findNodeWithBlock(bestToken.sourceBlockID);
