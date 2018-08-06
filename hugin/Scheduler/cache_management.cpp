@@ -80,15 +80,8 @@ void extractSubSectionToLoad(const DetailedBlockMetadata & toExtract, const Cach
 
 void buildWriteCommandToFlushCacheFromNodes(const vector<NetworkNode> & nodes, const VirtualMemory & virtualMemory, const BlockID & destination, DetailedBlock & commands)
 {
-#error "Finish implementation"
-
-	//We need to get the virtual addresses of all physical addresses currently loaded into the cache
-	DetailedBlock reverseTranslation;
 	for(const auto & node : nodes)
 	{
-		//Insert the raw block
-		reverseTranslation.insertNewSegment(DetailedBlockMetadata(node.block, BLOCK_SIZE));
-
 		for(const auto & token : node.tokens)
 		{
 			if(token.cleared)
@@ -96,35 +89,62 @@ void buildWriteCommandToFlushCacheFromNodes(const vector<NetworkNode> & nodes, c
 
 			for(const auto & segment : token.sourceToken)
 			{
+				//Get the section NOT in the cache
 				vector<DetailedBlockMetadata> sectionNotPresent;
 				extractSubSectionToLoad(segment, virtualMemory.tmpLayout, virtualMemory, false, sectionNotPresent);
+				
+				//If everything is, that's simpler
+				if(sectionNotPresent.empty())
+				{
+					commands.insertNewSegment(segment);
+					continue;
+				}
+				
+				//If nothing is in the cache, we can skip
+				if(sectionNotPresent.size() == 1 && sectionNotPresent.front().length == segment.length)
+				{
+					continue;
+				}
 
+				//We have fragments not in the cache, that sucks. First, let's sort the pieces recovered by source
 				sort(sectionNotPresent.begin(), sectionNotPresent.end(), [](const DetailedBlockMetadata & a, const DetailedBlockMetadata & b)
 				{
 					return a.source.value < b.source.value;
 				});
 
+				//We then get a "head" starting at the beginning of the segment
 				Address baseSegment = segment.origin;
 				size_t length = segment.length;
 
 				for(const auto & section : sectionNotPresent)
 				{
+					//Do we have a section in the cache before this segment?
 					if(baseSegment.value < section.source.value)
 					{
-
+						const size_t deltaLength = section.source.value - baseSegment.value;
+						commands.insertNewSegment(DetailedBlockMetadata(baseSegment, deltaLength, true));
 					}
-				}
 
-				//We add to the commands the full token
-				vector<DetailedBlockMetadata> translations;
-				virtualMemory.translateSegment(segment.origin, segment.length, translations);
+					const size_t jumpForward = section.source.value + section.length;
+					const size_t deltaJump = jumpForward - baseSegment.value;
+					assert(deltaJump <= length);
 
-				for(const auto & translation : translations)
-				{
-					commands.insertNewSegment()
+					baseSegment.value = jumpForward;
+					length -= deltaJump;
 				}
+				
+				if(length != 0)
+					commands.insertNewSegment(DetailedBlockMetadata(baseSegment, length, true));
 			}
 		}
+	}
+	
+	//Replace the destination by a sequence of addresses
+	Address outputAddress(destination, 0);
+	for(auto segment : commands.segments)
+	{
+		segment.destination = outputAddress;
+		outputAddress += segment.length;
 	}
 }
 

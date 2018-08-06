@@ -91,7 +91,7 @@ void Scheduler::halfSwapCodeGeneration(NetworkNode & firstNode, NetworkNode & se
 
 			DetailedBlock writeCommands(block);
 			buildWriteCommandToFlushCacheFromNodes({firstNode, secNode}, memoryLayout, block, writeCommands);
-			memoryLayout.writeTaggedToBlock(block, writeCommands, commands);
+			memoryLayout.cacheWrite(block, writeCommands, true, commands);
 		}
 
 	}, [&](bool didReverse)
