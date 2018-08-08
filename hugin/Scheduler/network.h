@@ -302,7 +302,7 @@ struct NetworkNode
 			tokens.emplace_back(dummyToken);
 	}
 
-	DetailedBlock compileLayout(bool wantWriteLayout) const;
+	DetailedBlock compileLayout(bool wantWriteLayout, const VirtualMemory & memoryLayout) const;
 };
 
 class Network

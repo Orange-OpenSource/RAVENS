@@ -283,9 +283,9 @@ void Scheduler::networkSwapCodeGeneration(const NetworkNode & firstNode, const N
 		{
 			//Blocks may be swapped internally
 			if(block == secNode.block)
-				memoryLayout.writeTaggedToBlock(secNode.block, secNode.compileLayout(true), commands, !secNode.isFinal);
+				memoryLayout.writeTaggedToBlock(secNode.block, secNode.compileLayout(true, memoryLayout), commands, !secNode.isFinal);
 			else
-				memoryLayout.writeTaggedToBlock(firstNode.block, firstNode.compileLayout(true), commands, !firstNode.isFinal);
+				memoryLayout.writeTaggedToBlock(firstNode.block, firstNode.compileLayout(true, memoryLayout), commands, !firstNode.isFinal);
 		}
 		else
 		{
@@ -293,7 +293,7 @@ void Scheduler::networkSwapCodeGeneration(const NetworkNode & firstNode, const N
 
 			if(curNode.isFinal)
 			{
-				memoryLayout.writeTaggedToBlock(curNode.block, curNode.compileLayout(true), commands, false);
+				memoryLayout.writeTaggedToBlock(curNode.block, curNode.compileLayout(true, memoryLayout), commands, false);
 				memoryLayout.performRedirect();
 
 #ifdef VERY_AGGRESSIVE_ASSERT
@@ -302,13 +302,13 @@ void Scheduler::networkSwapCodeGeneration(const NetworkNode & firstNode, const N
 #endif
 			}
 			else
-				memoryLayout.cacheWrite(curNode.block, curNode.compileLayout(true), true, commands);
+				memoryLayout.cacheWrite(curNode.block, curNode.compileLayout(true, memoryLayout), true, commands);
 		}
 
 	}, [&](bool didReverse)
 	{
 		const NetworkNode & curNode = didReverse ? secNode : firstNode;
-		return curNode.compileLayout(false);
+		return curNode.compileLayout(false, memoryLayout);
 
 	}, memoryLayout, commands, true);
 }
@@ -328,5 +328,5 @@ void Scheduler::pullDataToNode(const NetworkNode & node, VirtualMemory & memoryL
 	commands.insertCommand({ERASE, node.block});
 
 	//Then write the final layout
-	memoryLayout.writeTaggedToBlock(node.block, node.compileLayout(true), commands, false);
+	memoryLayout.writeTaggedToBlock(node.block, node.compileLayout(true, memoryLayout), commands, false);
 }
