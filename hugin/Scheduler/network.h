@@ -251,7 +251,7 @@ struct NetworkNode
 
 	bool dispatchInNodes(NetworkNode & node1, NetworkNode & node2);
 
-	void setFinal(size_t finalLength)
+	void setFinal(size_t finalLength, const VirtualMemory & memoryLayout)
 	{
 		isFinal = true;
 		nbSourcesIn = 0;
@@ -279,21 +279,32 @@ struct NetworkNode
 		//Write the final tokens to the self token, from our final layout
 		for(const auto & token : blockFinalLayout.segments)
 		{
-			if(token.tagged && token.source == block)
+			if(token.tagged)
 			{
-				bool tokenAlreadyThere = false;
-				for(const Token & existingToken : selfToken.get().sourceToken)
+				size_t tokenOffset = 0;
+				//We may have final token that migrated in us while we were not ready to turn final.
+				//In this case, we need to add a token so that we can protect against duplicates
+				memoryLayout.iterateTranslatedSegments(token.source, token.length, [&](const Address & source, const size_t length, bool)
 				{
-					if(existingToken.finalAddress == token.destination)
+					if(source == block)
 					{
-						tokenAlreadyThere = true;
-						break;
+						bool tokenAlreadyThere = false;
+						for(const Token & existingToken : selfToken.get().sourceToken)
+						{
+							if(existingToken.finalAddress == source)
+							{
+								assert(length <= existingToken.length);
+								tokenAlreadyThere = true;
+								break;
+							}
+						}
+						
+						//Insert the token if the data isn't already there
+						if(!tokenAlreadyThere)
+							selfToken.get().sourceToken.emplace_back(Token(token.destination + tokenOffset, length, token.source + tokenOffset));
 					}
-				}
-
-				//Insert the token if the data isn't already there
-				if(!tokenAlreadyThere)
-					selfToken.get().sourceToken.emplace_back(Token(token.destination, token.length, token.source));
+					tokenOffset += length;
+				});
 			}
 		}
 

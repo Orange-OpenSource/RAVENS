@@ -645,9 +645,7 @@ void Network::performToken(NetworkNode & source, NetworkNode & destination, Sche
 		}
 	}
 
-	//Remove overlap with fakeNode
-	if(!newSource.tokens.empty())
-		fakeCommonNode.removeOverlapWithToken({newSource.tokens.front()});
+	//We don't remove overlap with fakeNode yet, as we may pull more data with final
 
 	newSource.blockFinalLayout = source.blockFinalLayout;
 	newSource.lengthFinalLayout = source.lengthFinalLayout;
@@ -663,21 +661,65 @@ void Network::performToken(NetworkNode & source, NetworkNode & destination, Sche
 	//We can finish source AND destination, and still store the data that is necessary elsewhere
 	if(source.lengthFinalLayout + destination.lengthFinalLayout + lengthToAllocateLeft < 2 * BLOCK_SIZE)
 	{
-		newSource.setFinal(source.lengthFinalLayout);
-		newDest.setFinal(destination.lengthFinalLayout);
+		newSource.setFinal(source.lengthFinalLayout, memoryLayout);
+		newDest.setFinal(destination.lengthFinalLayout, memoryLayout);
 	}
 
 	//We can finish destination
 	else if(sourceLength + destination.lengthFinalLayout + lengthToAllocateLeft < 2 * BLOCK_SIZE)
 	{
-		newDest.setFinal(destination.lengthFinalLayout);
+		newDest.setFinal(destination.lengthFinalLayout, memoryLayout);
 	}
 
 	//We can finish source
 	else if(source.lengthFinalLayout + destLength + lengthToAllocateLeft < 2 * BLOCK_SIZE)
 	{
-		newSource.setFinal(source.lengthFinalLayout);
+		newSource.setFinal(source.lengthFinalLayout, memoryLayout);
 	}
+
+	//If one of the node have turned final, we remove incomming data from any other potential token
+	if(newSource.isFinal || newDest.isFinal)
+	{
+		vector<NetworkToken> finalToken;
+		//Source is going to remove anything that might end up in the self reference token. No need to care about what is actually already there
+		if(newSource.isFinal)
+		{
+			assert(newSource.tokens.size() == 1);
+
+			NetworkToken fakeSourceToken = newSource.tokens.front();
+			fakeSourceToken.sourceToken.clear();
+			fakeSourceToken.sourceToken.reserve(newSource.blockFinalLayout.segments.size());
+			
+			for(const auto & finalData : newSource.blockFinalLayout.segments)
+			{
+				if(finalData.tagged)
+					fakeSourceToken.sourceToken.emplace_back(Token(finalData.destination, finalData.length, finalData.source));
+			}
+			
+			finalToken.emplace_back(fakeSourceToken);
+		}
+		
+		if(newDest.isFinal)
+		{
+			assert(newDest.tokens.size() == 1);
+			
+			NetworkToken fakeDestToken = newDest.tokens.front();
+			fakeDestToken.sourceToken.clear();
+			fakeDestToken.sourceToken.reserve(newDest.blockFinalLayout.segments.size());
+			
+			for(const auto & finalData : newDest.blockFinalLayout.segments)
+			{
+				if(finalData.tagged)
+					fakeDestToken.sourceToken.emplace_back(Token(finalData.destination, finalData.length, finalData.source));
+			}
+			
+			finalToken.emplace_back(fakeDestToken);
+		}
+		
+		fakeCommonNode.removeOverlapWithToken(finalToken);
+	}
+	else if(!newSource.tokens.empty())
+		fakeCommonNode.removeOverlapWithToken({newSource.tokens.front()});
 
 	///At this point, if one of the blocks was going to be finished, we already allocated the relevant memory
 	///	We can then dispatch the data left
