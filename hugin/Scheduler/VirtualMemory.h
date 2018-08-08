@@ -247,7 +247,7 @@ struct TranslationTable
 	bool needToSkipCache(Address &read, Address &virtualRead, const size_t &length) const
 	{
 		//If the page isn't impacted in any way by translations, no need to iterate
-		if(impactOfTranslationToPerform.find(read.getBlock()) == impactOfTranslationToPerform.end())
+		if(impactOfTranslationToPerform.find(virtualRead.getBlock()) == impactOfTranslationToPerform.end())
 			return false;
 
 		for(auto pendingTranslation = translationsToPerform.crbegin(), end = translationsToPerform.crend(); pendingTranslation != end; ++pendingTranslation)
