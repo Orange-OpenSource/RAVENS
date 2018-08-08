@@ -396,14 +396,15 @@ struct VirtualMemory : public DetailedBlock
 						foundSomething = true;
 
 						const size_t lengthLeft = tmpSegment.length - fromOffset;
-						lambda(tmpSegment.destination + fromOffset, MIN(currentLength, lengthLeft), toward);
+						const size_t lengthUsed = MIN(currentLength, lengthLeft);
+						lambda(tmpSegment.destination + fromOffset, lengthUsed, toward);
 
 						if(unTagCache)
 						{
 							//We might have to fragment if the data we're getting isn't aligned on the cache buffer segments
 							if(lengthLeft != tmpSegment.length || lengthLeft != currentLength)
 							{
-								DetailedBlockMetadata newMetadata(tmpSegment.source + fromOffset, tmpSegment.destination + fromOffset, currentLength, true);
+								DetailedBlockMetadata newMetadata(tmpSegment.source + fromOffset, tmpSegment.destination + fromOffset, lengthUsed, true);
 								newMetadata.willUntag = true;
 								newTaggedSegments.emplace_back(newMetadata);
 							}
