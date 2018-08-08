@@ -1,2 +1,2 @@
-diff -v1 /home/taiki/opt/clang/bin/clang -v2 test_files/Hugin -o lol --flashSize 30 --verbose
-diff -v1 /home/taiki/opt/clang/bin/clang -v2 test_files/chrome -o lol --flashSize 30 --verbose
+diff -v1 clang -v2 test_files/Hugin -o lol --flashSize 30 --verbose
+diff -v1 clang -v2 test_files/chrome -o lol --flashSize 30 --verbose

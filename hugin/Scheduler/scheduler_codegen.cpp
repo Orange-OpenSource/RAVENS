@@ -158,18 +158,21 @@ void Scheduler::partialSwapCodeGeneration(const NetworkNode & firstNode, const N
 	swapOperator(second, didReverse, memoryLayout, commands);
 
 	//We check if there is any data in the cache. Otherwise, the next write is pointless
-	bool havePendingWrites = false;
-	for(const auto & segment : memoryLayout.tmpLayout.segments)
+	//	This check is skipped if we know we're going to have to go through this write anyway (if we're writing the final version)
+	bool havePendingWrites = (didReverse ? secNode : firstNode).isFinal;
+	if(!havePendingWrites)
 	{
-		if(segment.tagged)
+		for(const auto & segment : memoryLayout.tmpLayout.segments)
 		{
-			havePendingWrites = true;
-			break;
+			if(segment.tagged)
+			{
+				havePendingWrites = true;
+				break;
+			}
 		}
 	}
 
-	//If we're writing the final version, we override
-	if(havePendingWrites || (didReverse ? secNode : firstNode).isFinal)
+	if(havePendingWrites)
 	{
 		//Find the data we need to save from first
 		DetailedBlock largerNodeMeta = firstNodeLayout(didReverse);
