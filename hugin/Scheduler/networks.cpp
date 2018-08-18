@@ -885,6 +885,9 @@ void Network::pulledEverythingForNode(NetworkNode & node)
 		//Token is sorted
 		for(auto & networkNode : nodes)
 		{
+			if(networkNode.isFinal)
+				continue;
+			
 			size_t tokenPos = 0;
 			//Clear all token toward us
 			for(auto & token : networkNode.tokens)
