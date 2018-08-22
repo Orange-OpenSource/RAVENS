@@ -281,7 +281,7 @@ struct TranslationTable
  * 	/!\: Addresses in the cache have to be already translated
  */
 
-struct VirtualMemory : public DetailedBlock
+struct VirtualMemory
 {
 	//Source is the real address (where data come from)
 	//Destination is the virtual address
@@ -295,36 +295,9 @@ struct VirtualMemory : public DetailedBlock
 	BlockID cachedWriteBlock;
 	DetailedBlock cachedWriteRequest;
 
-	VirtualMemory(const vector<Block> &blocks) : tmpLayout(), translationTable(blocks), hasCache(false), hasCachedWrite(false), cachedWriteBlock(TMP_BUF), cachedWriteRequest()
-	{
-		size_t segmentLength = 0;
-		for (const Block &block : blocks)
-			segmentLength += block.data.size();
+	VirtualMemory(const vector<Block> &blocks) : tmpLayout(), translationTable(blocks), hasCache(false), hasCachedWrite(false), cachedWriteBlock(TMP_BUF), cachedWriteRequest() {}
 
-		segments.reserve(segmentLength);
-
-		for (const Block &block : blocks)
-		{
-			segments.emplace_back(block.blockID);
-			for (const auto &token : block.data)
-				insertNewSegment(token);
-		}
-	}
-
-	VirtualMemory(const vector<Block> &blocks, const vector<size_t> &indexes) : tmpLayout(), translationTable(blocks, indexes), hasCache(false), hasCachedWrite(false), cachedWriteBlock(TMP_BUF), cachedWriteRequest()
-	{
-		size_t segmentLength = 0;
-		for(const size_t & blockIndex : indexes)
-			segmentLength += blocks[blockIndex].data.size();
-
-		segments.reserve(segmentLength);
-		for(const size_t & blockIndex : indexes)
-		{
-			segments.emplace_back(blocks[blockIndex].blockID);
-			for (const auto &token : blocks[blockIndex].data)
-				insertNewSegment(token, true);
-		}
-	}
+	VirtualMemory(const vector<Block> &blocks, const vector<size_t> &indexes) : tmpLayout(), translationTable(blocks, indexes), hasCache(false), hasCachedWrite(false), cachedWriteBlock(TMP_BUF), cachedWriteRequest() {}
 
 	void performRedirect()
 	{
