@@ -301,7 +301,7 @@ void generateVerificationRangesPrePatch(SchedulerPatch &patch, size_t initialOff
 			if (segment.tagged)
 			{
 				if (segment.length > VerificationRange::maxLength)
-					lengthToAllocate += segment.length / VerificationRange::maxLength + segment.length % VerificationRange::maxLength;
+					lengthToAllocate += segment.length / VerificationRange::maxLength + (segment.length % VerificationRange::maxLength != 0);
 				else
 					lengthToAllocate += 1;
 			}
