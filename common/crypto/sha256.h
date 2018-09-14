@@ -30,6 +30,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#define UNUSED(x) (void)(x)
+
 /**
  * \brief          The SHA-256 context structure.
  *
@@ -81,7 +83,7 @@ void mbedtls_sha256_clone( mbedtls_sha256_context *dst,
  *
  * \return         \c 0 on success.
  */
-int mbedtls_sha256_starts_ret( mbedtls_sha256_context *ctx );
+int mbedtls_sha256_starts_ret( mbedtls_sha256_context *ctx, int is224 );
 
 /**
  * \brief          This function feeds an input buffer into an ongoing
@@ -141,7 +143,7 @@ int mbedtls_internal_sha256_process( mbedtls_sha256_context *ctx,
  */
 int mbedtls_sha256_ret( const unsigned char *input,
                         size_t ilen,
-                        unsigned char output[32] );
+                        unsigned char output[32], int is224 );
 
 /**
  * \brief          The SHA-224 and SHA-256 checkup routine.

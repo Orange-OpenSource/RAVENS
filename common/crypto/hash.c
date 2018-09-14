@@ -26,7 +26,7 @@ void hashBlock(const uint8_t * data, const size_t length, const uint16_t counter
 	mbedtls_sha256_context ctx;
 
     mbedtls_sha256_init( &ctx );
-	mbedtls_sha256_starts_ret( &ctx );
+	mbedtls_sha256_starts_ret( &ctx, 0 );
 
     if(!reuseHash)
 		mbedtls_sha256_update_ret( &ctx, hashBuffer, HASH_LENGTH );
@@ -40,7 +40,7 @@ void hashBlock(const uint8_t * data, const size_t length, const uint16_t counter
 
 HERMES_CRITICAL void hashMemory(const uint8_t * data, const size_t length, uint8_t * hashBuffer)
 {
-	mbedtls_sha256_ret(data, length, hashBuffer);
+	mbedtls_sha256_ret(data, length, hashBuffer, 0);
 }
 
 
@@ -55,7 +55,7 @@ bool hashFile(const char * filename, uint8_t * hashBuffer, size_t skip)
 
 	mbedtls_sha256_context ctx;
 	mbedtls_sha256_init( &ctx );
-	mbedtls_sha256_starts_ret( &ctx );
+	mbedtls_sha256_starts_ret( &ctx, 0 );
 
 	bool isEOF;
 

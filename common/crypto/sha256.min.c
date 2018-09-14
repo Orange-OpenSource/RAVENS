@@ -76,8 +76,9 @@ void mbedtls_sha256_free( mbedtls_sha256_context *ctx )
 /*
  * SHA-256 context setup
  */
-int mbedtls_sha256_starts_ret( mbedtls_sha256_context *ctx )
+int mbedtls_sha256_starts_ret( mbedtls_sha256_context *ctx, int is224 )
 {
+    UNUSED(is224);
     ctx->total[0] = 0;
     ctx->total[1] = 0;
 
@@ -299,14 +300,15 @@ int mbedtls_sha256_finish_ret( mbedtls_sha256_context *ctx,
  */
 int mbedtls_sha256_ret( const unsigned char *input,
                         size_t ilen,
-                        unsigned char output[32])
+                        unsigned char output[32], int is224)
 {
+    UNUSED(is224);
     int ret;
     mbedtls_sha256_context ctx;
 
     mbedtls_sha256_init( &ctx );
 
-    if( ( ret = mbedtls_sha256_starts_ret( &ctx ) ) != 0 )
+    if( ( ret = mbedtls_sha256_starts_ret( &ctx, 0 ) ) != 0 )
         goto exit;
 
     if( ( ret = mbedtls_sha256_update_ret( &ctx, input, ilen ) ) != 0 )
@@ -389,7 +391,7 @@ int mbedtls_sha256_self_test( int verbose )
         if( verbose != 0 )
             mbedtls_printf( "  SHA-256 test #%d: ", i + 1 );
 
-        if( ( ret = mbedtls_sha256_starts_ret( &ctx ) ) != 0 )
+        if( ( ret = mbedtls_sha256_starts_ret( &ctx, 0 ) ) != 0 )
             goto fail;
 
         if( i == 2 )
