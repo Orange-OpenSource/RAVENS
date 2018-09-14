@@ -128,22 +128,22 @@ void addReadRange(VerificationRangeCollector & readRange, const VerificationRang
 	{
 		Address endBase(address + length);
 		const auto & segments = blockRange->second.segments;
-		
+
 		auto wRange = lower_bound(segments.begin(), segments.end(), address, [](const DetailedBlockMetadata & meta, const Address & add) { return (meta.source + meta.length) < add; });
 		for(; wRange != segments.end(); ++wRange)
 		{
 			if(!wRange->tagged)
 				continue;
-			
+
 			//Block start after we end. We can stop
 			if(wRange->source > endBase)
 				break;
-			
+
 			//The segment end before we start
 			const Address endSegment(wRange->source + wRange->length);
 			if(endSegment < address)
 				continue;
-			
+
 			///This is _expensive_
 			if(wRange->overlapWith(address, length))
 			{
@@ -153,7 +153,7 @@ void addReadRange(VerificationRangeCollector & readRange, const VerificationRang
 					//No segment left
 					if(endSegment >= endBase)
 						return;
-					
+
 					//We shrink the segment and keep going
 					address = endSegment;
 					length = endBase.value - endSegment.value;
@@ -171,10 +171,10 @@ void addReadRange(VerificationRangeCollector & readRange, const VerificationRang
 				{
 					//We shrink the first half
 					length = endBase.value - wRange->source.value;
-					
+
 					const Address secHalf(endSegment);
 					const size_t secHalfLength = endBase.value - endSegment.value;
-					
+
 					//We make a recursive call with the smallest of the two halves
 					if(length > secHalfLength)
 					{
@@ -186,7 +186,7 @@ void addReadRange(VerificationRangeCollector & readRange, const VerificationRang
 						address = secHalf;
 						length = secHalfLength;
 					}
-					
+
 					endBase = address + length;
 				}
 			}
@@ -323,9 +323,9 @@ void generateVerificationRangesPrePatch(SchedulerPatch &patch, size_t initialOff
 
 				while(patchLength)
 				{
-					const uint16_t rangeLength = (uint16_t) (patchLength > VerificationRange::maxLength ? VerificationRange::maxLength : patchLength);
+					const size_t rangeLength = (patchLength > VerificationRange::maxLength ? VerificationRange::maxLength : patchLength);
 
-					patch.oldRanges.emplace_back(VerificationRange(static_cast<uint32_t>(initialOffset), static_cast<uint16_t>(rangeLength - 1)));
+					patch.oldRanges.emplace_back(VerificationRange(static_cast<uint32_t>(initialOffset), rangeLength));
 
 					patchLength -= rangeLength;
 					initialOffset += rangeLength;
@@ -355,9 +355,9 @@ void generateVerificationRangesPostPatch(SchedulerPatch & patch, size_t initialO
 	//Compute the ranges we want to have checked after the patch
 	while(patchLength)
 	{
-		const uint16_t rangeLength = (uint16_t) (patchLength > VerificationRange::maxLength ? VerificationRange::maxLength : patchLength);
+		const size_t rangeLength = (patchLength > VerificationRange::maxLength ? VerificationRange::maxLength : patchLength);
 
-		patch.newRanges.emplace_back(VerificationRange(static_cast<uint32_t>(initialOffset), static_cast<uint16_t>(rangeLength - 1)));
+		patch.newRanges.emplace_back(VerificationRange(static_cast<uint32_t>(initialOffset), rangeLength));
 
 		patchLength -= rangeLength;
 		initialOffset += rangeLength;

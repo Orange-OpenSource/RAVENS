@@ -63,7 +63,7 @@ void processValidationRequest(UpdateHashRequest * extraValidation, char ** respo
 			for(uint16_t i = 0; i < extraValidation->numberValidation; ++i)
 			{
 				uint8_t hash[HASH_LENGTH];
-				hashMemory((const uint8_t *) (uintptr_t) extraValidation->validateSegment[i].start, extraValidation->validateSegment[i].length + 1, hash);
+				hashMemory((const uint8_t *) (uintptr_t) extraValidation->validateSegment[i].start, extraValidation->validateSegment[i].length, hash);
 				memcpy(&(*response)[i * HASH_LENGTH], hash, sizeof(hash));
 			}
 

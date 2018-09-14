@@ -82,7 +82,7 @@ struct VerificationRange
 
 	VerificationRange(uint32_t _start, uint16_t _length) : start(_start), length(_length), expectedHash() {}
 
-	static const size_t maxLength = (1u << (sizeof(VerificationRange::length) * 8));
+	static const size_t maxLength = (1u << (sizeof(VerificationRange::length) * 8)) - 1;
 };
 
 struct SchedulerPatch
