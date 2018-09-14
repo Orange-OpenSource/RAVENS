@@ -97,7 +97,7 @@ void sendManifest2Request(const char * validationString, uint32_t validationStri
 	strcpy(&request[length], FINAL_REQUEST);
 	length += sizeof(FINAL_REQUEST) - 1;
 
-	strncpy(&request[length], validationString, validationStringLength);
+	memcpy(&request[length], validationString, validationStringLength);
 	length += validationStringLength;
 	request[length] = 0;
 
