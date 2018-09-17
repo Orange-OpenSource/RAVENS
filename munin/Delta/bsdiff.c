@@ -251,7 +251,8 @@ HERMES_CRITICAL bool applyDeltaPatch(const UpdateHeader * header, size_t current
 		//New page to patch!
 		if(!haveCachedPage)
 		{
-			incrementCounter(&traceCounter, previousCounter, pResuming);
+			if((traceCounter & 1) == 0)
+				incrementCounter(&traceCounter, previousCounter, pResuming);
 
 			//Save a new page to cache
 			if(!resuming)
@@ -317,7 +318,7 @@ HERMES_CRITICAL bool applyDeltaPatch(const UpdateHeader * header, size_t current
 		//Patch
 		else
 		{
-			const uint8_t * oldData = getBuffer(traceCounter);
+			const uint8_t * oldData = getBuffer(traceCounter - 1);
 
 			//Misaligned, we pad with a few bytes
 			while(currentOutputOffset & 7u && lengthLeft)
@@ -397,7 +398,7 @@ HERMES_CRITICAL bool applyDeltaPatch(const UpdateHeader * header, size_t current
 	if(currentOutputOffset != BLOCK_SIZE && !context.isOutOfData)
 	{
 		//Pad the current qword
-		const uint8_t * oldData = getBuffer(traceCounter);
+		const uint8_t * oldData = getBuffer(traceCounter - 1);
 		while(currentOutputOffset & WRITE_GRANULARITY_MASK)
 		{
 			const uint8_t data = oldData[currentOutputOffset];
