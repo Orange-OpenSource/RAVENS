@@ -65,14 +65,14 @@ def runImported():
 		if not os.path.exists(args.output):
 			os.makedirs(args.output)
 
-		output = []
+		output = {}
 
 	if args.deviceName not in output:
-		if "sign" not in args:
+		if "signUtil" not in args:
 			print("The --signUtil flag is mandatory when the device isn't already in Zeus' database")
 			return
 
-		entry = {'sign_util': args.sign}
+		entry = {'sign_util': args.signUtil}
 	else:
 		entry = output[args.deviceName]
 		del entry['payload']
@@ -144,19 +144,23 @@ def runImported():
 	output[args.deviceName] = entry
 
 	try:
-		shutil.copyfile(args.output + '/update.json', args.output + '/update.json.old')
+		if os.path.exists(args.output + '/update.json'):
+			shutil.copyfile(args.output + '/update.json', args.output + '/update.json.old')
 		with open(args.output + '/update.json', 'w+') as refFile:
 			json.dump(output, refFile, indent=4, separators=(',', ': '))
-		os.remove(args.output + '/update.json.old')
+		if os.path.exists(args.output + '/update.json.old'):
+			os.remove(args.output + '/update.json.old')
 
 	except (IOError, json.JSONDecodeError):
 		print("Couldn't write the update json! Aborting.")
 		shutil.rmtree(outputPath)
-		os.rename(oldDirectoryPath, outputPath)
+		if os.path.exists(oldDirectoryPath):
+			os.rename(oldDirectoryPath, outputPath)
 
 		# Restore the old update manifest
-		os.remove(args.output + '/update.json')
-		shutil.copyfile(args.output + '/update.json.old', args.output + '/update.json')
+		if os.path.exists(args.output + '/update.json'):
+			os.remove(args.output + '/update.json')
+			shutil.copyfile(args.output + '/update.json.old', args.output + '/update.json')
 		return
 
 	print(
