@@ -37,12 +37,8 @@ extern "C"
 #include "Userland/userland.h"
 }
 
-extern "C" void bootloaderPerformUpdate();
-extern "C" void requestUpdate(const void *);
-
 int main()
 {
-	bootloaderPerformUpdate();
 
 	printf("Booting version %lu...\n", getVersion());
 

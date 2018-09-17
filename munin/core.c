@@ -236,3 +236,10 @@ HERMES_CRITICAL void bootloaderPerformUpdate()
 	//Reboot
 	reboot();
 }
+
+void _start(void);
+HERMES_CRITICAL void _start_with_update()
+{
+	bootloaderPerformUpdate();
+	_start();
+}

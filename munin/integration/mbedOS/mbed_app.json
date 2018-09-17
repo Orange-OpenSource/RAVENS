@@ -8,11 +8,9 @@
 	"target_overrides": {
 		"*": {
 			"target.features_add": ["COMMON_PAL"],
-            "nanostack.configuration": "lowpan_router",
             "platform.stdio-baud-rate": 115200,
-            "platform.stdio-convert-newlines": true,
-            "mbed-mesh-api.6lowpan-nd-channel-page": 0,
-            "mbed-mesh-api.6lowpan-nd-channel": 12
+            "platform.stdio-convert-newlines": true
 		}
-	}
+	},
+    "macros": ["__START=\"_start_with_update\""]
 }
