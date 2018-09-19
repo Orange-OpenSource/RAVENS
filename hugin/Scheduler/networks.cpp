@@ -202,8 +202,11 @@ bool NetworkNode::dispatchInNodes(NetworkNode & node1, NetworkNode & node2)
 				if(iter->length <= spaceLeft)
 				{
 					NetworkToken tokenMoved = *iter;
+					const size_t currentIterPos = iter - tokens.begin();
+
 					tokens.erase(iter);
 					removeOverlapWithToken({tokenMoved});
+					iter = tokens.begin() + currentIterPos;
 
 #ifdef VERY_AGGRESSIVE_ASSERT
 					//Validate the length of the token
