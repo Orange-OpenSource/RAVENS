@@ -185,6 +185,17 @@ bool NetworkNode::dispatchInNodes(NetworkNode & node1, NetworkNode & node2)
 			size_t spaceLeft = BLOCK_SIZE - nodeCurrentOccupation;
 
 			assert(nodeCurrentOccupation <= BLOCK_SIZE);
+			
+			//We check whether the token length is consistent with the occupation level (otherwise, this would imply internal duplication)
+			if(node.tokens.front().length != (BLOCK_SIZE - spaceLeft))
+			{
+				assert(node.tokens.size() == 1);
+
+				//It looks like have some duplicate subtoken. We shrink that
+				node.tokens.front().removeOverlapWith({});
+
+				assert(node.tokens.front().length == (BLOCK_SIZE - spaceLeft));
+			}
 
 			for(auto iter = tokens.begin(); iter != tokens.end() && spaceLeft;)
 			{
