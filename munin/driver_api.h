@@ -12,6 +12,7 @@ extern "C"
 {
 #endif
 
+#include "core.h"
 void reboot();
 void enableIRQ();
 void disableIRQ();

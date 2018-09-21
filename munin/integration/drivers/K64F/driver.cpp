@@ -28,7 +28,7 @@ extern "C"
 
 	bool irqAlreadyDisabled = false;
 
-	void enableIRQ()
+	HERMES_CRITICAL void enableIRQ()
 	{
 		if(irqAlreadyDisabled)
 		{
@@ -37,7 +37,7 @@ extern "C"
 		}
 	}
 
-	void disableIRQ()
+	HERMES_CRITICAL void disableIRQ()
 	{
 		if(!irqAlreadyDisabled)
 		{
