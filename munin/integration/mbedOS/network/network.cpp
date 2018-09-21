@@ -1,12 +1,15 @@
-//
-//	File: network.cpp
-//
-//	Purpose: Main networking wrapper, provide the data stream in 4kB chunks
-//
-//	Author: Emile-Hugo Spir
-//
-//	Copyright: Orange
-//
+/*
+ * Copyright (C) 2018 Orange
+ *
+ * This software is distributed under the terms and conditions of the 'BSD-3-Clause-Clear'
+ * license which can be found in the file 'LICENSE.txt' in this package distribution
+ * or at 'https://spdx.org/licenses/BSD-3-Clause-Clear.html'.
+ */
+
+/**
+ * Purpose: Main networking wrapper, provide the data stream in 4kB chunks
+ * @author Emile-Hugo Spir
+ */
 
 #ifdef TARGET_LIKE_MBED
 	#include "TCPSocket.h"
@@ -78,7 +81,7 @@ static struct NetworkStreaming
 	//	Current buffer lifecycle:
 	//		Pointed by Next Write Buffer
 	//		Marked as Ready
-	//		Pointed by Next Read Buffer 
+	//		Pointed by Next Read Buffer
 	//		Pointed by Buffer Being Consumed
 
 	uint8_t bufferMeta;
@@ -161,10 +164,10 @@ static void NetworkStreamingShutdown(struct NetworkStreaming & data)
 	data.interface->disconnect();
 	data.isInitialized = false;
 #endif
-	
+
 	free(data.buffer0);
 	free(data.buffer1);
-	
+
 	data.buffer0 = NULL;
 	data.buffer1 = NULL;
 
@@ -218,7 +221,7 @@ static bool newRequest(struct NetworkStreaming & data, const char * domain, cons
 			networkMutex.unlock();
 #endif
 			return false;
-		}		
+		}
 	}
 
 	if(data.buffer1 == NULL)
@@ -345,7 +348,7 @@ static uint8_t * consumeData(uint32_t & length)
 
 	uint8_t * output;
 
-	//First, we clear the Being Consumed flag of the other buffer so we can start downloading in it 
+	//First, we clear the Being Consumed flag of the other buffer so we can start downloading in it
 	//If the next buffer to read is ready, we put it in output
 	//We also clear the BUFFER_X_READY bit, and mark the buffer as being consumed
 	uint8_t bufferToRead = pickBufferRead(state);
@@ -457,7 +460,7 @@ UVISOR_STATIC void proxyReleaseData()
 		//Mark all remaining buffers being consumed as done
 		status &= ~BUFFER_CONSUMPTION_MASK;
 
-		//If the download is over and 
+		//If the download is over and
 		if(networkStaticMemory.downloadIsOver && haveBufferReady(status) == false)
 		{
 #ifdef TARGET_LIKE_MBED
@@ -507,7 +510,7 @@ UVISOR_STATIC void proxyShutDown()
 #ifdef UVISOR_FEATURE
 void networkingRPC()
 {
-	// List of functions to wait for 
+	// List of functions to wait for
 	static const TFN_Ptr functions[] = {
 		(TFN_Ptr) proxyNewRequest,
 		(TFN_Ptr) proxyRequestHasData,

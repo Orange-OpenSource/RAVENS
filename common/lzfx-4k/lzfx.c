@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018 Emile-Hugo Spir <emile-hugo.spir at taiki.fr>
+ * Copyright (C) 2018 Orange by Emile-Hugo Spir
  *
  * Implements a LZFX-based compressor/decompressor built on top of the lzfx codebase.
  * The compressor isn't compatible with LZF but reduces the memory requirements of the
@@ -13,19 +13,19 @@
  * codebase written by Marc Lehmann.  This code is released under the BSD
  * license.  License and original copyright statement follow.
  *
- * 
+ *
  * Copyright (c) 2000-2008 Marc Alexander Lehmann <schmorp@schmorp.de>
- * 
+ *
  * Redistribution and use in source and binary forms, with or without modifica-
  * tion, are permitted provided that the following conditions are met:
- * 
+ *
  *   1.  Redistributions of source code must retain the above copyright notice,
  *       this list of conditions and the following disclaimer.
- * 
+ *
  *   2.  Redistributions in binary form must reproduce the above copyright
  *       notice, this list of conditions and the following disclaimer in the
  *       documentation and/or other materials provided with the distribution.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR IMPLIED
  * WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MER-
  * CHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO

@@ -1,3 +1,10 @@
+/*
+ * Copyright (C) 2018 Orange by Emile-Hugo Spir
+ *
+ * Improved program_flash() and verify_erased(). Added section attribute.
+ *
+ * This file is retrived at https://os.mbed.com/users/Sissors/code/FreescaleIAP/ under Apache license
+ */
 #include "FreescaleIAP.h"
 
 // #define NO_CRITICAL

@@ -1,6 +1,14 @@
-//
-// Created by Emile-Hugo Spir on 3/27/18.
-//
+/*
+ * Copyright (C) 2018 Orange
+ *
+ * This software is distributed under the terms and conditions of the 'BSD-3-Clause-Clear'
+ * license which can be found in the file 'LICENSE.txt' in this package distribution
+ * or at 'https://spdx.org/licenses/BSD-3-Clause-Clear.html'.
+ */
+
+/**
+ * @author Emile-Hugo Spir
+ */
 
 #include "scheduler.h"
 
@@ -103,14 +111,14 @@ void buildWriteCommandToFlushCacheFromNodes(const vector<NetworkNode> & nodes, c
 				//Get the section NOT in the cache
 				vector<DetailedBlockMetadata> sectionNotPresent;
 				extractSubSectionToLoad(segment, virtualMemory.tmpLayout, virtualMemory, false, sectionNotPresent);
-				
+
 				//If everything is, that's simpler
 				if(sectionNotPresent.empty())
 				{
 					commands.insertNewSegment(segment);
 					continue;
 				}
-				
+
 				//If nothing is in the cache, we can skip
 				if(sectionNotPresent.size() == 1 && sectionNotPresent.front().length == segment.length)
 				{
@@ -143,13 +151,13 @@ void buildWriteCommandToFlushCacheFromNodes(const vector<NetworkNode> & nodes, c
 					baseSegment.value = jumpForward;
 					length -= deltaJump;
 				}
-				
+
 				if(length != 0)
 					commands.insertNewSegment(DetailedBlockMetadata(baseSegment, length, true));
 			}
 		}
 	}
-	
+
 	//Replace the destination by a sequence of addresses
 	Address outputAddress(destination, 0);
 	for(auto segment : commands.segments)

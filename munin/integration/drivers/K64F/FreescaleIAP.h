@@ -1,3 +1,7 @@
+/*
+ * This file is retrived at https://os.mbed.com/users/Sissors/code/FreescaleIAP/ under Apache license
+ */
+
 #ifndef FREESCALEIAP_H
 #define FREESCALEIAP_H
 
@@ -23,7 +27,7 @@ enum IAPCode {
     AccessError,            //Something went wrong
     CollisionError,         //During writing something tried to flash which was written to
     LengthError,            //The length must be multiples of 4
-    RuntimeError,           
+    RuntimeError,
     EraseError,             //The flash was not erased before writing to it
     Success = 0
     };
@@ -51,7 +55,7 @@ IAPCode program_flash(int address, char *data, unsigned int length);
 
 /**
  * Returns size of flash memory
- * 
+ *
  * This is the first address which is not flash
  *
  * @param return length of flash memory in bytes

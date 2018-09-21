@@ -1,6 +1,14 @@
-//
-// Created by Emile-Hugo Spir on 3/21/18.
-//
+/*
+ * Copyright (C) 2018 Orange
+ *
+ * This software is distributed under the terms and conditions of the 'BSD-3-Clause-Clear'
+ * license which can be found in the file 'LICENSE.txt' in this package distribution
+ * or at 'https://spdx.org/licenses/BSD-3-Clause-Clear.html'.
+ */
+
+/**
+ * @author Emile-Hugo Spir
+ */
 
 #include <algorithm>
 #include <unordered_set>
@@ -185,7 +193,7 @@ bool NetworkNode::dispatchInNodes(NetworkNode & node1, NetworkNode & node2)
 			size_t spaceLeft = BLOCK_SIZE - nodeCurrentOccupation;
 
 			assert(nodeCurrentOccupation <= BLOCK_SIZE);
-			
+
 			//We check whether the token length is consistent with the occupation level (otherwise, this would imply internal duplication)
 			if(node.tokens.front().length != (BLOCK_SIZE - spaceLeft))
 			{
@@ -703,33 +711,33 @@ void Network::performToken(NetworkNode & source, NetworkNode & destination, Sche
 			NetworkToken fakeSourceToken = newSource.tokens.front();
 			fakeSourceToken.sourceToken.clear();
 			fakeSourceToken.sourceToken.reserve(newSource.blockFinalLayout.segments.size());
-			
+
 			for(const auto & finalData : newSource.blockFinalLayout.segments)
 			{
 				if(finalData.tagged)
 					fakeSourceToken.sourceToken.emplace_back(Token(finalData.destination, finalData.length, finalData.source));
 			}
-			
+
 			finalToken.emplace_back(fakeSourceToken);
 		}
-		
+
 		if(newDest.isFinal)
 		{
 			assert(newDest.tokens.size() == 1);
-			
+
 			NetworkToken fakeDestToken = newDest.tokens.front();
 			fakeDestToken.sourceToken.clear();
 			fakeDestToken.sourceToken.reserve(newDest.blockFinalLayout.segments.size());
-			
+
 			for(const auto & finalData : newDest.blockFinalLayout.segments)
 			{
 				if(finalData.tagged)
 					fakeDestToken.sourceToken.emplace_back(Token(finalData.destination, finalData.length, finalData.source));
 			}
-			
+
 			finalToken.emplace_back(fakeDestToken);
 		}
-		
+
 		fakeCommonNode.removeOverlapWithToken(finalToken);
 	}
 	else if(!newSource.tokens.empty())
@@ -901,7 +909,7 @@ void Network::pulledEverythingForNode(NetworkNode & node)
 		{
 			if(networkNode.isFinal)
 				continue;
-			
+
 			size_t tokenPos = 0;
 			//Clear all token toward us
 			for(auto & token : networkNode.tokens)

@@ -1,6 +1,14 @@
-//
-// Created by Emile-Hugo Spir on 3/21/18.
-//
+/*
+ * Copyright (C) 2018 Orange
+ *
+ * This software is distributed under the terms and conditions of the 'BSD-3-Clause-Clear'
+ * license which can be found in the file 'LICENSE.txt' in this package distribution
+ * or at 'https://spdx.org/licenses/BSD-3-Clause-Clear.html'.
+ */
+
+/**
+ * @author Emile-Hugo Spir
+ */
 
 #ifndef HERMES_NETWORK_H
 #define HERMES_NETWORK_H
@@ -298,7 +306,7 @@ struct NetworkNode
 								break;
 							}
 						}
-						
+
 						//Insert the token if the data isn't already there
 						if(!tokenAlreadyThere)
 							selfToken.get().sourceToken.emplace_back(Token(token.destination + tokenOffset, length, token.source + tokenOffset));
