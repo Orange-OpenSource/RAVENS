@@ -1,6 +1,6 @@
 # Hugin
 
-Hugin is a command line util able to generate small delta software updates, easy to install in-place on constrained devices. Hugin can then be used to authentificate the update package, can distribute it to devices. Munin offer a reference implementation of the code necessary on the device to install the update package, in place, in a resilient manner.
+Hugin is a command line util able to generate small delta software updates, easy to install in-place on constrained devices. Hugin can then be used to authenticate the update package, can distribute it to devices. Munin offer a reference implementation of the code necessary on the device to install the update package, in place, in a resilient manner.
 
 Properly used, Hugin and Munin enable secure and efficient firmware updates of very small IoT devices.
 
@@ -24,7 +24,7 @@ Hugin can generate update packages through two ways.
 
 ## Sign an update
 
-This step require access to the device master key. This cryptographic key is EXTREMELY powerful and thus should be stored on a secure computer, hopefully an HSM. At the very least, it is strongly recommanded to perform the signing on a dedicated, air-gapped server.
+This step require access to the device master key. This cryptographic key is EXTREMELY powerful and thus should be stored on a secure computer, hopefully an HSM. At the very least, it is strongly recommended to perform the signing on a dedicated, air-gapped server.
 Assuming this is the case, this is done, the following command will make Hugin sign the various update packages: `path/to/Hugin authenticate -p path/to/update/directory/ -o path/to/signed/output/directory/ -k path/to/priv.key`
 
 ## Import an update to the serveur
@@ -43,15 +43,27 @@ The port is configured at the top of `server.py`.
 
 ## Test the binary
 
-This test doesn't validate wether the binary was tampered with, only that features work as expected.
+This test doesn't validate whether the binary was tampered with, only that features work as expected.
 
 `path/to/Hugin test`.
 
 # Dependencies & Integrations
 
+## Common
+
+Both Hugin and Munin depend on the following cryptographic libraries:
+
+* the `libhydrogen` library, which is included in this repository as a submodule in `hugin/libhydrogen/`.
+
+* the `sha256` from `mbed TLS` library.
+
 ## Hugin
 
-Hugin depend of the `rapidjson` library, which is included in this repository as a submodule in `hugin/thirdparty/`.
+Hugin depends of multiples open-source libraries:
+
+* the `rapidjson` library, which is included in this repository as a submodule in `hugin/thirdparty/`.
+
+* the `bsdiff` tool, which is included directly in `hugin/Scheduler/bsdiff`, with a light modification.
 
 ## Munin
 
@@ -59,6 +71,10 @@ Munin is largely an integration reference of our system on as many platforms as 
 
 ### mbedOS
 
-A reference driver for mbedOS, specialized for the K64F board is available.
-This driver include the main mbedOS repository and the `easy-connect` component, as a way to keep the minimal network code a generic as possible.
+* The reference integration is implemented on the top of mbedOS.
+
+* Network drivers rely on the `easy-connect` component from mbedOS, as a way to keep the minimal network code a generic as possible.
+
+* A modified version of `FreescaleIAP` driver is used to implement flash rewriting.
+
 A `make_mbed.sh` script is available and, assuming it is run from the root of the repository, will build the compilation environment for building Munin on mbedOS.
