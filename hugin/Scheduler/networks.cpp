@@ -195,7 +195,7 @@ bool NetworkNode::dispatchInNodes(NetworkNode & node1, NetworkNode & node2)
 			assert(nodeCurrentOccupation <= BLOCK_SIZE);
 
 			//We check whether the token length is consistent with the occupation level (otherwise, this would imply internal duplication)
-			if(node.tokens.front().length != (BLOCK_SIZE - spaceLeft))
+			if(!node.tokens.empty() && node.tokens.front().length != (BLOCK_SIZE - spaceLeft))
 			{
 				assert(node.tokens.size() == 1);
 

@@ -188,7 +188,7 @@ struct NetworkNode
 	{
 		DetailedBlock layout;
 
-		size_t output = 0;
+		size_t output = isFinal ? lengthFinalLayout : 0;
 
 		for(const auto & token : tokens)
 		{
@@ -197,7 +197,7 @@ struct NetworkNode
 			//We have to add the data manually
 			if(isFinal && token.destinationBlockID == block)
 			{
-				output += lengthFinalLayout;
+				//We already incremented output
 				for(const auto & item : blockFinalLayout.segments)
 				{
 					if(item.tagged)
