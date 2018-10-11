@@ -135,6 +135,11 @@ struct NetworkToken
 
 	size_t removeOverlapWith(const vector<NetworkToken> & networkToken);
 	size_t overlapWith(const NetworkToken & networkToken) const;
+    
+    size_t removeInternalOverlap()
+    {
+        return removeOverlapWith({});
+    }
 
 	bool operator<(const NetworkToken & b) const { return destinationBlockID < b.destinationBlockID; }
 	bool operator<(const BlockID & b) const { return destinationBlockID < b; }

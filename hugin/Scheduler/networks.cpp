@@ -200,7 +200,7 @@ bool NetworkNode::dispatchInNodes(NetworkNode & node1, NetworkNode & node2)
 				assert(node.tokens.size() == 1);
 
 				//It looks like have some duplicate subtoken. We shrink that
-				node.tokens.front().removeOverlapWith({});
+				node.tokens.front().removeInternalOverlap();
 
 				assert(node.tokens.front().length == (BLOCK_SIZE - spaceLeft));
 			}
@@ -607,11 +607,13 @@ void Network::performToken(NetworkNode & source, NetworkNode & destination, Sche
 	NetworkToken oldSource(vector<Token>{});
 	bool hadSource = false;
 
-	//In order to determine the length of source data already in source, we need to have a look before merger
+	//In order to the data belonging to source already there, we need to have a look before merger
+    // All data belonging to source won't necessarily end up in newSource, but anything already there will, so we can make sure to converge toward a solution
 	auto sourceCoreIter = lower_bound(tokenPool.begin(), tokenPool.end(), source.block);
 	if(sourceCoreIter != tokenPool.end() && sourceCoreIter->destinationBlockID == source.block)
 	{
 		oldSource = *sourceCoreIter;
+        oldSource.removeInternalOverlap();
 		tokenPool.erase(sourceCoreIter);
 		hadSource = true;
 	}
@@ -631,12 +633,12 @@ void Network::performToken(NetworkNode & source, NetworkNode & destination, Sche
 	tokenPool.erase(destinationCoreIter);
 
 	//Remove overlap
-	fakeCommonNode.removeOverlapWithToken({destinationCore});
+	destinationCore.removeInternalOverlap();
+	fakeCommonNode.removeOverlapWithToken({destinationCore, (hadSource ? oldSource : NetworkToken({}))});
 
 	//The prior iterator may be invalid after the merger
 	sourceCoreIter = lower_bound(tokenPool.begin(), tokenPool.end(), source.block);
 	const bool hasSourceCore = sourceCoreIter != tokenPool.end() && sourceCoreIter->destinationBlockID == source.block;
-	const size_t sourceCoreLength = hasSourceCore ? sourceCoreIter->length : 0;
 
 	//Create the new containers
 	NetworkNode newSource(source.block, hadSource ? vector<NetworkToken>{oldSource} : vector<NetworkToken>());
@@ -676,8 +678,8 @@ void Network::performToken(NetworkNode & source, NetworkNode & destination, Sche
 	newDest.lengthFinalLayout = destination.lengthFinalLayout;
 
 	/// We want to determine whether we have enough headroom to make one of the blocks final
-	size_t sourceLength = sourceCoreLength;
-	size_t destLength = destinationCore.length;
+	size_t sourceLength = newSource.getOccupationLevel();
+	size_t destLength = newDest.getOccupationLevel();
 	size_t lengthToAllocateLeft = fakeCommonNode.getOccupationLevel();
 
 	//We can finish source AND destination, and still store the data that is necessary elsewhere
