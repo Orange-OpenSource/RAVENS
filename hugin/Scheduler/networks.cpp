@@ -683,20 +683,20 @@ void Network::performToken(NetworkNode & source, NetworkNode & destination, Sche
 	size_t lengthToAllocateLeft = fakeCommonNode.getOccupationLevel();
 
 	//We can finish source AND destination, and still store the data that is necessary elsewhere
-	if(source.lengthFinalLayout + destination.lengthFinalLayout + lengthToAllocateLeft < 2 * BLOCK_SIZE)
+	if(source.lengthFinalLayout + destination.lengthFinalLayout + lengthToAllocateLeft <= 2 * BLOCK_SIZE)
 	{
 		newSource.setFinal(source.lengthFinalLayout, memoryLayout);
 		newDest.setFinal(destination.lengthFinalLayout, memoryLayout);
 	}
 
 	//We can finish destination
-	else if(sourceLength + destination.lengthFinalLayout + lengthToAllocateLeft < 2 * BLOCK_SIZE)
+	else if(sourceLength + destination.lengthFinalLayout + lengthToAllocateLeft <= 2 * BLOCK_SIZE)
 	{
 		newDest.setFinal(destination.lengthFinalLayout, memoryLayout);
 	}
 
 	//We can finish source
-	else if(source.lengthFinalLayout + destLength + lengthToAllocateLeft < 2 * BLOCK_SIZE)
+	else if(source.lengthFinalLayout + destLength + lengthToAllocateLeft <= 2 * BLOCK_SIZE)
 	{
 		newSource.setFinal(source.lengthFinalLayout, memoryLayout);
 	}
