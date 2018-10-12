@@ -46,7 +46,7 @@ int main(int argc, char *argv[])
 		else if(!strcmp(argv[1], "diff"))
 		{
 			if(processScheduler(argc - 1, &argv[1]))
-				cout << "Successful generation!";
+				cout << "Successful generation!" << endl;
 
 			return 0;
 		}
@@ -63,6 +63,8 @@ int main(int argc, char *argv[])
 			cout << "Validating the code generation..." << endl << "	";
 			performStaticTests();
 			runDynamicTestWithFiles("/bin/ls", "/bin/cat");
+			runDynamicTestWithFiles("test1_v1.bin", "test1_v2.bin");
+			runDynamicTestWithFiles("test2_v1.bin", "test2_v2.bin");
 
 			cout << endl << "Validation cryptographic primitives" << endl;
 			testCrypto();

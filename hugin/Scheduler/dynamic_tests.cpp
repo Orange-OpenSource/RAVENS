@@ -104,6 +104,15 @@ bool runDynamicTestWithFiles(const char * original, const char * newFile)
 
 	uint8_t * originalData = readFile(original, &originalLength);
 	uint8_t * newData = readFile(newFile, &newLength);
+	
+	if(originalData == nullptr || newData == nullptr)
+	{
+		cout << "Missing test files (" << original << " / " << newFile << ")!" << endl;
+
+		free(originalData);
+		free(newData);
+		return true;
+	}
 
 	bool output = runDynamicTest(originalData, originalLength, newData, newLength);
 
