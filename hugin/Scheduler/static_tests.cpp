@@ -12,7 +12,65 @@
 
 #include "scheduler.h"
 
-bool validateStaticResults(const vector<PublicCommand> &real, const vector<Command> &expectation)
+bool dynamicallyCheckStaticTest(const vector<PublicCommand> & real, const vector<BSDiffMoves> &input)
+{
+	assert(!input.empty());
+	
+	size_t min = SIZE_T_MAX, max = 0;
+	for(const auto & move : input)
+	{
+		if(move.start < min)
+			min = move.start;
+		
+		if(move.dest < min)
+			min = move.dest;
+		
+		if(move.start + move.length > max)
+			max = move.start + move.length;
+		
+		if(move.dest + move.length > max)
+			max = move.dest + move.length;
+	}
+	
+	min &= BLOCK_MASK;
+	max &= BLOCK_MASK;
+	
+	size_t bufferLength = max - min + BLOCK_SIZE;
+	uint8_t * buffer = (uint8_t*) malloc(bufferLength), *ref = (uint8_t*) malloc(bufferLength);
+	
+	assert(buffer != nullptr && ref != nullptr);
+	
+	//We only really want a non-repeating patern
+	for(size_t i = 0; i < bufferLength; ++i)
+		buffer[i] = ref[i] = rand() & 0xff;
+	
+	//The code better not _crash_ the VM
+	if(!virtualMachine(real, buffer, bufferLength))
+		assert(false);
+	
+	bool fail = false;
+	for(const auto & move : input)
+	{
+		if(memcmp(&ref[move.start], &buffer[move.dest], move.length))
+		{
+			cerr << "The code generated doesn't perform the required moves" << endl << endl;
+			fail = true;
+			break;
+		}
+	}
+	
+	free(buffer);
+	free(ref);
+	
+	if(!fail)
+	{
+		cout << "Despite different code, the test is valid" << endl << endl;
+	}
+	
+	return !fail;
+}
+
+bool validateStaticResults(const vector<PublicCommand> &real, const vector<Command> &expectation, const vector<BSDiffMoves> &moves)
 {
 	const size_t lengthExpected = expectation.size();
 	const size_t lengthReal = real.size();
@@ -36,7 +94,7 @@ bool validateStaticResults(const vector<PublicCommand> &real, const vector<Comma
 
 		if(testFail)
 		{
-			cout << endl;
+			dynamicallyCheckStaticTest(real, moves);
 		}
 #ifdef VERBOSE_STATIC_TESTS
 		else
@@ -52,12 +110,14 @@ bool validateStaticResults(const vector<PublicCommand> &real, const vector<Comma
 		else
 			cout << "Test failure : not enough instructions (" << lengthReal << " < " << lengthExpected << ")" << endl;
 
-		for(const auto & instruction : real)
-			Command(instruction).print();
-
-		cout << endl;
+		if(!dynamicallyCheckStaticTest(real, moves))
+		{
+			for(const auto & instruction : real)
+				Command(instruction).print();
+			cout << endl;
+		}
 	}
-
+	
 	return !testFail;
 }
 
@@ -80,7 +140,7 @@ bool firstPassTest()
 	vector<PublicCommand> output;
 
 	schedule(input, output);
-	return validateStaticResults(output, expected);
+	return validateStaticResults(output, expected, input);
 }
 
 bool secondPassTest()
@@ -101,7 +161,7 @@ bool secondPassTest()
 									  {COPY, TMP_BUF, 0x64, 0x64, 0x0, 0x190}};
 	vector<PublicCommand> output;
 	schedule(input, output);
-	return validateStaticResults(output, expected);
+	return validateStaticResults(output, expected, input);
 }
 
 bool thirdPassSimpleChain()
@@ -164,7 +224,7 @@ bool thirdPassSimpleChain()
 
 	vector<PublicCommand> output;
 	schedule(input, output);
-	return validateStaticResults(output, expected);
+	return validateStaticResults(output, expected, input);
 }
 
 bool thirdPassTestWithFullRecovery()
@@ -248,7 +308,7 @@ bool thirdPassTestWithFullRecovery()
 
 	vector<PublicCommand> output;
 	schedule(input, output);
-	return validateStaticResults(output, expected);
+	return validateStaticResults(output, expected, input);
 }
 
 bool thirdPassTestWithExternalReference()
@@ -322,7 +382,7 @@ bool thirdPassTestWithExternalReference()
 
 	vector<PublicCommand> output;
 	schedule(input, output);
-	return validateStaticResults(output, expected);
+	return validateStaticResults(output, expected, input);
 }
 
 #define FRAGMENT (BLOCK_SIZE >> 2u)
@@ -421,7 +481,7 @@ bool forthPassTest()
 
 	vector<PublicCommand> output;
 	schedule(input, output);
-	return validateStaticResults(output, expected);
+	return validateStaticResults(output, expected, input);
 }
 
 bool forthPassTestWithCompetitiveRead()
@@ -520,7 +580,7 @@ bool forthPassTestWithCompetitiveRead()
 
 	vector<PublicCommand> output;
 	schedule(input, output);
-	return validateStaticResults(output, expected);
+	return validateStaticResults(output, expected, input);
 }
 
 bool forthPassTestWithHarderCompetitiveRead()
@@ -613,7 +673,7 @@ bool forthPassTestWithHarderCompetitiveRead()
 
 	vector<PublicCommand> output;
 	schedule(input, output);
-	return validateStaticResults(output, expected);
+	return validateStaticResults(output, expected, input);
 }
 
 bool forthPassTestWithCompetitiveReadOnReusedSpace()
@@ -707,7 +767,7 @@ bool forthPassTestWithCompetitiveReadOnReusedSpace()
 
 	vector<PublicCommand> output;
 	schedule(input, output);
-	return validateStaticResults(output, expected);
+	return validateStaticResults(output, expected, input);
 }
 
 void performStaticTests()
