@@ -123,8 +123,12 @@ struct DetailedBlock
 		size_t length = segments.size() - 1, i = 0;
 		while (i < length)
 		{
+			//We don't want to compact over page boundaries. It doesn't provide much (any?) performance advantage, for a lot of headaches
+			if(segments[i].source.getBlock() != segments[i + 1].source.getBlock())
+				i += 1;
+			
 			//The source of the data in those two chunks is contiguous and they have the same tag status
-			if (segments[i].source.getAddress() + segments[i].length == segments[i + 1].source.getAddress()
+			else if (segments[i].source.getAddress() + segments[i].length == segments[i + 1].source.getAddress()
 				&& segments[i].tagged == segments[i + 1].tagged)
 			{
 				//We lengthen the first segment and delete the next
