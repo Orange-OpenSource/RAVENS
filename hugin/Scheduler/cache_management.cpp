@@ -378,13 +378,13 @@ void VirtualMemory::loadTaggedToTMP(const DetailedBlock & dataToLoad, SchedulerD
 
 #ifdef VERY_AGGRESSIVE_ASSERT
 	//We check if we have enough room in the cache to load our data
-	size_t lengthToFitInCache = 0;
+	size_t lengthAlreadyInCache = 0, lengthToFitInCache = 0;
 
 	//Room already in use
 	for(const auto & segment : tmpLayout.segments)
 	{
 		if(segment.tagged)
-			lengthToFitInCache += segment.length;
+			lengthAlreadyInCache += segment.length;
 	}
 
 	//Data to load
@@ -403,7 +403,7 @@ void VirtualMemory::loadTaggedToTMP(const DetailedBlock & dataToLoad, SchedulerD
 	}
 
 	//If this assert fail, we're trying to load too much data in the cache
-	assert(lengthToFitInCache <= BLOCK_SIZE);
+	assert(lengthAlreadyInCache + lengthToFitInCache <= BLOCK_SIZE);
 #endif
 
 	_loadTaggedToTMP(dataToLoad, commands, noTranslation);

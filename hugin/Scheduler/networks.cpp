@@ -346,7 +346,7 @@ DetailedBlock NetworkNode::compileLayout(bool wantWriteLayout, const VirtualMemo
 			{
 				for(auto chunk = output.segments.cbegin(); chunk != output.segments.cend(); )
 				{
-					if(chunk->tagged && chunk->fitWithin(chunk->source, chunk->length, token.origin))
+					if(chunk->tagged && chunk->fitWithin(chunk->source, chunk->length, token.origin))	//Shouldn't happen anymore
 					{
 						const size_t skip = chunk->length - (token.origin.getAddress() - chunk->source.getAddress());
 						const size_t delta = MIN(skip, token.length);

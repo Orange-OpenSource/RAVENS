@@ -22,14 +22,10 @@ DetailedBlock extractDataNecessaryInSecondary(const VirtualMemory & memoryLayout
 		{
 			for(const auto & token : netToken.sourceToken)
 			{
-				vector<DetailedBlockMetadata> translation;
-				memoryLayout.translateSegment(token.origin, token.length, translation);
-
-				for(const auto &segment: translation)
-				{
-					if(segment.source == toLoad)
-						necessaryDataInSecondary.insertNewSegment(DetailedBlockMetadata(segment.source, segment.length, true));
-				}
+				memoryLayout.iterateTranslatedSegments(token.origin, token.length, [&](const Address& from, const size_t length, bool) {
+					if(from == toLoad)
+						necessaryDataInSecondary.insertNewSegment(DetailedBlockMetadata(from, length, true));
+				});
 			}
 		}
 	}
@@ -45,17 +41,17 @@ DetailedBlock extractDataNecessaryInSecondary(const VirtualMemory & memoryLayout
  *
  * This algorithm is used when a cycle of more than two items is detected.
  * The problem it solves is having to keep track of discarded data from one block that are necessary to another (the one that is pulling data from this block)
- * 		without requiring more than a block worth in memory for execution (theoritical minimum, as we must erase a full block is order to write anything)
- * The naive approch requires up to 2x (1.5x after some optimizations) the size of a block in memory (in order to save this data while loading the block
- * 		we're about to erase in memory as its content may be used by the next block in the chain.
+ * 		without requiring more than a block worth in memory for execution (theoritical minimum, as we must erase a full block is order to write anything, requiring a block worth of backup memory)
+ * The naive approch requires up to 2x (1.5x after some optimizations) the size of a block in memory in simple cycle cases (in order to save this data while loading the block
+ * 		we're about to erase in memory as its content may be used by the next block in the chain).
  *
  * In our configuration, as illustrated below, block B need `b` bytes of data from bloc A, etc...
  *
  * 	(A) - b -> (B)
- * 	 ^			|
+ * 	 ↑			|
  * 	 |			c
  * 	 a			|
- * 	 |			v
+ * 	 |			↓
  * 	(D) <- d - (C)
  *
  * 	HS works by first looking for a specific patern and work on it. Specifically, three blocks (for instance, A, B and C) where the link
@@ -63,10 +59,10 @@ DetailedBlock extractDataNecessaryInSecondary(const VirtualMemory & memoryLayout
  * 		without any data left in the temporary buffer
  *
  * 	(A) <- ≤ b - (B)
- * 	 ^ \
+ * 	 ↑ \
  * 	 |	\
- * 	 a	 -> c --.
- * 	 |			v
+ * 	 a	 ↳ c --.
+ * 	 |			↓
  * 	(D) <- d - (C)
  *
  * 	This new configuration effectively remove B from the cycle and thus the algorithm can be executed again until only two blocks are left in the cycle,
@@ -74,12 +70,12 @@ DetailedBlock extractDataNecessaryInSecondary(const VirtualMemory & memoryLayout
  *
  * 	The spirit of half swap is to load B in memory, wipe the block and write the final version of B (parts of B + b)
  * 	We then defragment the temporary buffer and only keep c, then load what data from A that wasn't copied in B (A - b) in the buffer
- * 	We can then wipe A and write the content of the temporary buffer.
+ * 	We can then wipe A and write the content of the temporary buffer to it.
  * 	Because b > c, we can be sure to have the room, possibly leaving a couple of unused bytes
- * 	This algorithm however requires a robust virtual memory system to keep track of c being moved and defragmented from B to A
+ * 	This algorithm however requires a robust virtual memory system to keep track of c being moved and defragmented from B to A, and parts of b that was expected in A but was moved to B.
  */
 
-//First has the largest link
+//First has the largest outgoing link
 void Scheduler::halfSwapCodeGeneration(NetworkNode & firstNode, NetworkNode & secNode, VirtualMemory & memoryLayout, SchedulerData & commands)
 {
 	Scheduler::partialSwapCodeGeneration(firstNode, secNode, [&](const BlockID & block, bool, VirtualMemory& memoryLayout, SchedulerData& commands)
@@ -125,23 +121,23 @@ void Scheduler::halfSwapCodeGeneration(NetworkNode & firstNode, NetworkNode & se
 
 void Scheduler::partialSwapCodeGeneration(const NetworkNode & firstNode, const NetworkNode & secNode, SwapOperator swapOperator, FirstNodeLayoutGenerator firstNodeLayout, VirtualMemory & memoryLayout, SchedulerData & commands, bool canReorder)
 {
-	BlockID first = firstNode.block, second = secNode.block;
+	BlockID firstBlockID = firstNode.block, secondBlockID = secNode.block;
 
 	//If we have a cached write and also write to the same block, we can merge those two writes
 	bool cacheAlreadyLoaded = false, didReverse = false;
 	if(memoryLayout.hasCachedWrite)
 	{
-		if(memoryLayout.cachedWriteBlock == first && canReorder)
+		if(memoryLayout.cachedWriteBlock == firstBlockID && canReorder)
 		{
-			BlockID tmp = second;
-			second = first;
-			first = tmp;
+			BlockID tmp = secondBlockID;
+			secondBlockID = firstBlockID;
+			firstBlockID = tmp;
 
 			memoryLayout.dropCachedWrite();
 			cacheAlreadyLoaded = true;
 			didReverse = true;
 		}
-		else if(memoryLayout.cachedWriteBlock == second)
+		else if(memoryLayout.cachedWriteBlock == secondBlockID)
 		{
 			memoryLayout.dropCachedWrite();
 			cacheAlreadyLoaded = true;
@@ -155,7 +151,7 @@ void Scheduler::partialSwapCodeGeneration(const NetworkNode & firstNode, const N
 	{
 		memoryLayout.commitCachedWrite(commands);
 
-		DetailedBlock necessaryDataInSecondary = extractDataNecessaryInSecondary(memoryLayout, firstNode, secNode, second);
+		DetailedBlock necessaryDataInSecondary = extractDataNecessaryInSecondary(memoryLayout, firstNode, secNode, secondBlockID);
 		memoryLayout.flushCache();
 
 		//We can load the data in TMP_BUF
@@ -163,7 +159,7 @@ void Scheduler::partialSwapCodeGeneration(const NetworkNode & firstNode, const N
 	}
 
 	//We then write back the data of second
-	swapOperator(second, didReverse, memoryLayout, commands);
+	swapOperator(secondBlockID, didReverse, memoryLayout, commands);
 
 	//We check if there is any data in the cache. Otherwise, the next write is pointless
 	//	This check is skipped if we know we're going to have to go through this write anyway (if we're writing the final version)
@@ -189,7 +185,7 @@ void Scheduler::partialSwapCodeGeneration(const NetworkNode & firstNode, const N
 		memoryLayout.loadTaggedToTMP(largerNodeMeta, commands);
 
 		//We then erase and write `first`
-		swapOperator(first, didReverse, memoryLayout, commands);
+		swapOperator(firstBlockID, didReverse, memoryLayout, commands);
 	}
 }
 
