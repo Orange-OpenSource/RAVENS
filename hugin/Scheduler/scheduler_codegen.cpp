@@ -187,6 +187,8 @@ void Scheduler::partialSwapCodeGeneration(const NetworkNode & firstNode, const N
 		//We then erase and write `first`
 		swapOperator(firstBlockID, didReverse, memoryLayout, commands);
 	}
+	else
+		memoryLayout.performRedirect();
 }
 
 void Scheduler::reorderingSwapCodeGeneration(NetworkNode & firstNode, NetworkNode & secondaryNode, VirtualMemory & memoryLayout, SchedulerData & commands)
