@@ -22,7 +22,6 @@
  *
  * 	Initial instructions #				: 59
  * 	+CODEGEN_OPTIMIZATIONS				: 48 (extremely efficient on benchmarks, likely less so in real world scenarios)
- *	+TMP_STRATEGY_PROGRESSIVE			: 43
  *	+AVOID_UNECESSARY_REWRITE			: 41
  *	+IGNORE_BLOCK_LAYOUT_UNLESS_FINAL	: 39
  *	+IGNORE_CACHE_LAYOUT				: 39 (useful for forthPassTestWithCompetitiveRead)
@@ -32,11 +31,6 @@
 
 //Look at the code generated to group commands in similar commands but fewer of them
 #define CODEGEN_OPTIMIZATIONS
-
-//Determine how we fill the TMP cache.
-//	If defined, we fit the new data in existing holes, only moving stuffs when necessary
-//	If not, we first compact the cache by moving all its content at the beginning and then fit anything necessary at the end (this branch is buggy and will assert at some point)
-#define TMP_STRATEGY_PROGRESSIVE
 
 //Will try to avoid writting a block just to wipe it without using its content
 //	Basically, we try to play Domino with some types of writes

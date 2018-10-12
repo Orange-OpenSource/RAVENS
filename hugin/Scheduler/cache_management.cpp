@@ -165,7 +165,6 @@ void VirtualMemory::_retagReusedToken(vector<DetailedBlockMetadata> & sortedToke
 #warning "To Implement"
 }
 
-#ifdef TMP_STRATEGY_PROGRESSIVE
 void VirtualMemory::_loadTaggedToTMP(const DetailedBlock & dataToLoad, SchedulerData & commands)
 {
 	CacheMemory tmpLayoutCopy = tmpLayout;
@@ -270,94 +269,6 @@ void VirtualMemory::_loadTaggedToTMP(const DetailedBlock & dataToLoad, Scheduler
 	commands.finishTransaction();
 	tmpLayout = tmpLayoutCopy;
 }
-
-#else
-
-void trimUntaggedSpaceInTmp(CacheMemory & tmpLayout, SchedulerData & commands)
-{
-	commands.newTransaction();
-
-	Address readHead = TMP_BUF, writeHead = TMP_BUF;
-
-	for(auto & tmpSegment : tmpLayout.segments)
-	{
-		if(tmpSegment.tagged)
-		{
-			if(readHead.getOffset() != writeHead.getOffset())
-			{
-				commands.insertCommand({COPY, readHead, tmpSegment.length, writeHead});
-				tmpSegment.destination = writeHead;
-			}
-
-			writeHead += tmpSegment.length;
-		}
-
-		readHead += tmpSegment.length;
-	}
-
-	commands.finishTransaction();
-
-	//Now, some book keeping in tmpLayout
-
-	//Remove all untagged blocks
-	tmpLayout.segments.erase(remove_if(tmpLayout.segments.begin(), tmpLayout.segments.end(),
-									   [](const DetailedBlockMetadata & block)
-									   { return !block.tagged; }), tmpLayout.segments.end());
-
-	//Add a final block using all the available space at the end
-	const size_t finalOffset = tmpLayout.segments.empty() ? 0 : tmpLayout.segments.back().getFinalDestOffset();
-
-	if(finalOffset != BLOCK_SIZE)
-		tmpLayout.insertNewSegment(DetailedBlockMetadata(TMP_BUF + finalOffset, BLOCK_SIZE - finalOffset, false));
-
-	tmpLayout.compactSegments();
-}
-
-void VirtualMemory::_loadTaggedToTMP(const DetailedBlock & dataToLoad, SchedulerData & commands)
-{
-	CacheMemory tmpLayoutCopy = tmpLayout;
-	trimUntaggedSpaceInTmp(tmpLayoutCopy, commands);
-
-	Address tmpBuffer = tmpLayoutCopy.segments.back().destination;
-
-	commands.newTransaction();
-	for (const auto &segment : dataToLoad.segments)
-	{
-		if (segment.tagged)
-		{
-			if(noTranslation)
-			{
-				if (segment.source.getOffset() == 0 && segment.length == BLOCK_SIZE && tmpBuffer.getOffset() == 0)
-					commands.insertCommand({COPY, segment.source, segment.length, TMP_BUF});
-				else
-					commands.insertCommand({COPY, segment.source, segment.length, tmpBuffer});
-
-				tmpLayoutCopy.insertNewSegment({segment.source, tmpBuffer, segment.length, true});
-				tmpBuffer += segment.length;
-			}
-			else
-			{
-				iterateTranslatedSegments(segment.source, segment.length, [&, segment](const Address & address, const size_t length, bool ignoreCache)
-				{
-					if (address.getOffset() == 0 && length == BLOCK_SIZE && tmpBuffer.getOffset() == 0)
-						commands.insertCommand({COPY, segment.source, segment.length, TMP_BUF});
-					else
-						generateCopyWithTranslatedAddress(address, length, tmpBuffer, commands, ignoreCache, false);
-
-					tmpLayoutCopy.insertNewSegment({address, tmpBuffer, length, true});
-					tmpBuffer += length;
-				});
-			}
-
-			//We must NEVER excess the capacity of TMP_BUF)
-			assert(tmpLayoutCopy.availableRoom() >= 0);
-		}
-	}
-
-	commands.finishTransaction();
-	tmpLayout = tmpLayoutCopy;
-}
-#endif
 
 void VirtualMemory::loadTaggedToTMP(const DetailedBlock & dataToLoad, SchedulerData & commands)
 {
