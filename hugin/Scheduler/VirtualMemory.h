@@ -138,7 +138,6 @@ struct CacheMemory : public DetailedBlock
 struct TranslationTable
 {
 	unordered_map<BlockID, DetailedBlock> translationData;
-	vector<DetailedBlockMetadata> translationsToPerform;
 
 	TranslationTable(const vector<Block> &blocks)
 	{
@@ -170,31 +169,17 @@ struct TranslationTable
 		}
 	}
 
-	//FIXME: Get rid of staggered redirects as they don't really serve any purpose nowadays
-	void staggeredRedirect(const Address &addressToRedirect, size_t length, const Address &newBaseAddress)
+	void redirect(const Address &addressToRedirect, size_t length, const Address &newBaseAddress)
 	{
 		assert(length > 0);
-		translationsToPerform.emplace_back(DetailedBlockMetadata(newBaseAddress, addressToRedirect, length, true));
-	}
 
-	void performRedirect()
-	{
-		for(const auto & translation : translationsToPerform)
+		auto translationArray = translationData.find(addressToRedirect.getBlock());
+		if(translationArray != translationData.end())
 		{
-			const BlockID & block = translation.destination.getBlock();
-
-			//We ignore redirections for data outside the network
-
-			auto translationArray = translationData.find(block);
-			if(translationArray != translationData.end())
-			{
-				//Translations must fit in a single page
-				assert((translation.destination.value & BLOCK_OFFSET_MASK) + translation.length <= BLOCK_SIZE);
-				translationArray->second.insertNewSegment(translation);
-			}
+			//Translations must fit in a single page
+			assert((addressToRedirect.value & BLOCK_OFFSET_MASK) + length <= BLOCK_SIZE);
+			translationArray->second.insertNewSegment(DetailedBlockMetadata(newBaseAddress, addressToRedirect, length, true));
 		}
-
-		translationsToPerform.clear();
 	}
 
 	void translateSegment(Address from, size_t length, function<void(const Address&, const size_t)>processing) const
@@ -289,11 +274,6 @@ struct VirtualMemory
 	VirtualMemory(const vector<Block> &blocks) : cacheLayout(), translationTable(blocks), hasCachedWrite(false), cachedWriteBlock(CACHE_BUF), cachedWriteRequest() {}
 
 	VirtualMemory(const vector<Block> &blocks, const vector<size_t> &indexes) : cacheLayout(), translationTable(blocks, indexes), hasCachedWrite(false), cachedWriteBlock(CACHE_BUF), cachedWriteRequest() {}
-
-	void performRedirect()
-	{
-		translationTable.performRedirect();
-	}
 
 	void flushCache()
 	{
@@ -455,7 +435,7 @@ struct VirtualMemory
 			Address toward(destination, 0);
 			for(auto & copy : canonicalCopy)
 			{
-				translationTable.staggeredRedirect(copy.virtualSource, copy.length, toward);
+				translationTable.redirect(copy.virtualSource, copy.length, toward);
 				copy.destination = toward;
 				toward += copy.length;
 			}
@@ -474,12 +454,11 @@ struct VirtualMemory
 					if(segment.destination == destination)
 						offset = segment.destination.getOffset();
 
-					translationTable.staggeredRedirect(segment.source, segment.length, Address(destination, offset));
+					translationTable.redirect(segment.source, segment.length, Address(destination, offset));
 					offset += segment.length;
 				}
 			}
 		}
-		performRedirect();
 
 		for(const auto & copy : canonicalCopy)
 			commands.insertCommand({COPY, copy.source, copy.length, copy.destination});
