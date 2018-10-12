@@ -94,7 +94,12 @@ bool validateStaticResults(const vector<PublicCommand> &real, const vector<Comma
 
 		if(testFail)
 		{
-			dynamicallyCheckStaticTest(real, moves);
+			if(!dynamicallyCheckStaticTest(real, moves))
+			{
+				for(const auto & instruction : real)
+					Command(instruction).print();
+				cout << endl;
+			}
 		}
 #ifdef VERBOSE_STATIC_TESTS
 		else

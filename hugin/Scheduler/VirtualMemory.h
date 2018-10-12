@@ -184,6 +184,7 @@ struct TranslationTable
 	//Basically, if we do that and overwrite the source of the data, writes would confuse the (obsolete) data in cache and the fresh data
 	void staggeredRedirect(const Address &addressToRedirect, size_t length, const Address &newBaseAddress)
 	{
+		assert(length > 0);
 		translationsToPerform.emplace_back(DetailedBlockMetadata(newBaseAddress, addressToRedirect, length, true));
 		impactOfTranslationToPerform.insert(addressToRedirect.getBlock());
 		splitAtIndex(addressToRedirect, length);
