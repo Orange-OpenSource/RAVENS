@@ -12,7 +12,7 @@
 
 #include "scheduler.h"
 
-DetailedBlock extractDataNecessaryInSecondary(const VirtualMemory & memoryLayout, const NetworkNode &first, const NetworkNode &second, const BlockID & toLoad)
+DetailedBlock extractDataNecessaryInSecondary(const VirtualMemory & memoryLayout, const vector<NetworkNode> &nodes, const BlockID & toLoad)
 {
 	DetailedBlock necessaryDataInSecondary;
 
@@ -25,7 +25,9 @@ DetailedBlock extractDataNecessaryInSecondary(const VirtualMemory & memoryLayout
 				size_t shift = 0;
 				memoryLayout.iterateTranslatedSegments(token.origin, token.length, [&](const Address& from, const size_t length) {
 					if(from == toLoad)
-						necessaryDataInSecondary.insertNewSegment(DetailedBlockMetadata(from, length, true));
+						necessaryDataInSecondary.insertNewSegment(DetailedBlockMetadata(token.origin + shift, length, true));
+					
+					shift += length;
 				});
 			}
 		}
@@ -152,7 +154,7 @@ void Scheduler::partialSwapCodeGeneration(const NetworkNode & firstNode, const N
 	{
 		memoryLayout.commitCachedWrite(commands);
 
-		DetailedBlock necessaryDataInSecondary = extractDataNecessaryInSecondary(memoryLayout, firstNode, secNode, secondBlockID);
+		DetailedBlock necessaryDataInSecondary = extractDataNecessaryInSecondary(memoryLayout, {firstNode, secNode}, secondBlockID);
 		memoryLayout.flushCache();
 
 		//We can load the data in TMP_BUF
@@ -180,7 +182,7 @@ void Scheduler::partialSwapCodeGeneration(const NetworkNode & firstNode, const N
 	if(havePendingWrites)
 	{
 		//Find the data we need to save from first
-		DetailedBlock largerNodeMeta = extractDataNecessaryInSecondary(memoryLayout, (didReverse ? secNode : firstNode), (didReverse ? secNode : firstNode), firstBlockID);
+		DetailedBlock largerNodeMeta = extractDataNecessaryInSecondary(memoryLayout, {(didReverse ? secNode : firstNode)}, firstBlockID);
 
 		//FIXME: If good enough, may be worth canning the argument
 //		DetailedBlock largerNodeMeta = firstNodeLayout(didReverse);
@@ -222,10 +224,10 @@ void Scheduler::reorderingSwapCodeGeneration(NetworkNode & firstNode, NetworkNod
 	if(!cacheAlreadyLoaded && !isFirstFinal)
 	{
 		//Load the first block to TMP and erase it
-		DetailedBlock necessaryDataInSecondary = extractDataNecessaryInSecondary(memoryLayout, firstNode, secondaryNode, first);
+		DetailedBlock necessaryDataInSecondary = extractDataNecessaryInSecondary(memoryLayout, {firstNode, secondaryNode}, first);
 
 		//We can load the data in TMP_BUF
-		memoryLayout.loadTaggedToTMP(necessaryDataInSecondary, commands, true);
+		memoryLayout.loadTaggedToTMP(necessaryDataInSecondary, commands);
 
 		//All the data being loaded, we can flush the page corresponding to secondaryNode
 		commands.insertCommand({ERASE, first});
@@ -326,7 +328,7 @@ void Scheduler::pullDataToNode(const NetworkNode & node, VirtualMemory & memoryL
 		memoryLayout.commitCachedWrite(commands);
 
 	//Load the first block to TMP and erase it
-	DetailedBlock necessaryDataInSecondary = extractDataNecessaryInSecondary(memoryLayout, node, node, node.block);
+	DetailedBlock necessaryDataInSecondary = extractDataNecessaryInSecondary(memoryLayout, {node}, node.block);
 
 	//We can load the data in TMP_BUF
 	memoryLayout.loadTaggedToTMP(necessaryDataInSecondary, commands);
