@@ -315,6 +315,8 @@ struct NetworkNode
 				});
 			}
 		}
+		
+		selfToken.get().removeInternalOverlap();
 
 		//If a new token, we insert it into the array
 		if(!foundCore)
