@@ -233,60 +233,6 @@ struct DetailedBlock
 		}
 	}
 
-	void splitAtIndex(vector<DetailedBlockMetadata> &segmentsVector, const Address & destinationToMatch, size_t length)
-	{
-		//We need to split the translation table so needToSkipCache can make a granular decision
-		vector<DetailedBlockMetadata>::iterator section = lower_bound(segmentsVector.begin(), segmentsVector.end(), destinationToMatch, [](const DetailedBlockMetadata & a, const Address & b) { return (a.destination.value + a.length) <= b.value; });
-
-		//Address is outside the translation table
-		if(section == segmentsVector.end())
-			return;
-
-		if(!section->overlapWith(section->destination, section->length, destinationToMatch, 1))
-			return;
-
-		//The segment start before us
-		if(section->destination.value != destinationToMatch.value)
-		{
-			const size_t delta = destinationToMatch.value - section->destination.value;
-
-			//Preceding segment
-			DetailedBlockMetadata newMeta = *section;
-			newMeta.length = delta;
-
-			section->destination += delta;
-			section->source += delta;
-			section->length -= delta;
-
-			auto offset = section - segmentsVector.begin();
-
-			segmentsVector.insert(section, newMeta);
-			section = segmentsVector.begin() + offset + 1;
-		}
-
-		for(; length != 0 && section != segmentsVector.end(); ++section)
-		{
-			//The segment is already shorter
-			if(section->length <= length)
-			{
-				length -= section->length;
-			}
-				//We're at the end, we need to split the segment
-			else
-			{
-				DetailedBlockMetadata newMeta = *section;
-				newMeta.length = length;
-
-				section->destination += length;
-				section->source += length;
-				section->length -= length;
-				length = 0;
-
-				segmentsVector.insert(section, newMeta);
-			}
-		}
-	}
-
 protected:
 
 	void _insertNewSegment(vector<DetailedBlockMetadata> &segmentsVector, DetailedBlockMetadata metadataBlock, bool skipResize = false)

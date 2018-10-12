@@ -324,11 +324,11 @@ bool NetworkNode::dispatchInNodes(NetworkNode & node1, NetworkNode & node2)
 	return needDivide;
 }
 
-DetailedBlock NetworkNode::compileLayout(bool wantWriteLayout, const VirtualMemory & memoryLayout) const
+DetailedBlock NetworkNode::compileLayout() const
 {
 	DetailedBlock output(block);
 	//If we are the final form, we sadly must respect blockFinalLayout, possibly at the cost of extra fragmentation
-	if(wantWriteLayout && isFinal)
+	if(isFinal)
 		output = blockFinalLayout;
 
 	//We have to fit everything left in tokens in output
@@ -336,7 +336,7 @@ DetailedBlock NetworkNode::compileLayout(bool wantWriteLayout, const VirtualMemo
 	{
 		//The self reference contains all the data that belong here, which may be more than what is actually in the cache
 		const bool isOversizedSelfReference = isFinal && netToken.destinationBlockID == block;
-		if(wantWriteLayout && isOversizedSelfReference)
+		if(isOversizedSelfReference)
 			continue;
 
 		for (auto token : netToken.sourceToken)
@@ -368,25 +368,8 @@ DetailedBlock NetworkNode::compileLayout(bool wantWriteLayout, const VirtualMemo
 
 			if(token.length > 0)
 			{
-				//We're looking for data to load in the cache. We have to exclude what is going to be imported (no point in copying that into the cache, as we're not erasing it)
-				if(!wantWriteLayout && isOversizedSelfReference)
-				{
-					size_t processedLength = 0;
-					memoryLayout.iterateTranslatedSegments(token.origin, token.length, [&](const Address & from, const size_t length) {
-						if(from == block)
-						{
-							const bool result = output.fitSegmentInUntagged({Token(token.origin + processedLength, length, token.origin + processedLength), true});
-							assert(result);
-						}
-						processedLength += length;
-					});
-				}
-				else
-				{
-					const bool result = output.fitSegmentInUntagged({token, true});
-					assert(result);
-				}
-
+				const bool result = output.fitSegmentInUntagged({token, true});
+				assert(result);
 			}
 		}
 	}

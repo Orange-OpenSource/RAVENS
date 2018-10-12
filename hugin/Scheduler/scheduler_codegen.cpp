@@ -85,7 +85,6 @@ void Scheduler::halfSwapCodeGeneration(NetworkNode & firstNode, NetworkNode & se
 	{
 		commands.insertCommand({ERASE, block});
 
-		//partialSwapCodeGeneration isn't allowed to swap the two nodes so we don't need to care about that
 		//FIXME: make swap of nodes possible
 		if(block == secNode.block)
 		{
@@ -101,28 +100,10 @@ void Scheduler::halfSwapCodeGeneration(NetworkNode & firstNode, NetworkNode & se
 			memoryLayout.cacheWrite(block, writeCommands, true, commands);
 		}
 
-	}, [&](bool didReverse)
-	{
-		//We tag for backup any relevant data from out node
-		const NetworkNode & curNode = didReverse ? secNode : firstNode;
-		DetailedBlock largerNodeMeta(curNode.block);
-
-		//We add the data that are required by someone else
-		for(const auto & netToken : curNode.tokens)
-		{
-			//We ignore token toward secNode (already copied)
-			if(netToken.cleared)
-				continue;
-
-			//The tokens are either already located on our page and need backup, or are already on the cache
-			for(const auto & token : netToken.sourceToken)
-				largerNodeMeta.insertNewSegment(DetailedBlockMetadata(token.origin, token.length, true));
-		}
-		return largerNodeMeta;
 	}, memoryLayout, commands, false);
 }
 
-void Scheduler::partialSwapCodeGeneration(const NetworkNode & firstNode, const NetworkNode & secNode, SwapOperator swapOperator, FirstNodeLayoutGenerator firstNodeLayout, VirtualMemory & memoryLayout, SchedulerData & commands, bool canReorder)
+void Scheduler::partialSwapCodeGeneration(const NetworkNode & firstNode, const NetworkNode & secNode, SwapOperator swapOperator, VirtualMemory & memoryLayout, SchedulerData & commands, bool canReorder)
 {
 	BlockID firstBlockID = firstNode.block, secondBlockID = secNode.block;
 
@@ -183,9 +164,6 @@ void Scheduler::partialSwapCodeGeneration(const NetworkNode & firstNode, const N
 	{
 		//Find the data we need to save from first
 		DetailedBlock largerNodeMeta = extractDataNecessaryInSecondary(memoryLayout, {(didReverse ? secNode : firstNode)}, firstBlockID);
-
-		//FIXME: If good enough, may be worth canning the argument
-//		DetailedBlock largerNodeMeta = firstNodeLayout(didReverse);
 
 		//Load it in the cache
 		memoryLayout.loadTaggedToTMP(largerNodeMeta, commands);
@@ -293,9 +271,9 @@ void Scheduler::networkSwapCodeGeneration(const NetworkNode & firstNode, const N
 		{
 			//Blocks may be swapped internally
 			if(block == secNode.block)
-				memoryLayout.writeTaggedToBlock(secNode.block, secNode.compileLayout(true, memoryLayout), commands, !secNode.isFinal);
+				memoryLayout.writeTaggedToBlock(secNode.block, secNode.compileLayout(), commands, !secNode.isFinal);
 			else
-				memoryLayout.writeTaggedToBlock(firstNode.block, firstNode.compileLayout(true, memoryLayout), commands, !firstNode.isFinal);
+				memoryLayout.writeTaggedToBlock(firstNode.block, firstNode.compileLayout(), commands, !firstNode.isFinal);
 		}
 		else
 		{
@@ -303,7 +281,7 @@ void Scheduler::networkSwapCodeGeneration(const NetworkNode & firstNode, const N
 
 			if(curNode.isFinal)
 			{
-				memoryLayout.writeTaggedToBlock(curNode.block, curNode.compileLayout(true, memoryLayout), commands, false);
+				memoryLayout.writeTaggedToBlock(curNode.block, curNode.compileLayout(), commands, false);
 
 #ifdef VERY_AGGRESSIVE_ASSERT
 				for(const auto & segment : memoryLayout.tmpLayout.segments)
@@ -311,14 +289,8 @@ void Scheduler::networkSwapCodeGeneration(const NetworkNode & firstNode, const N
 #endif
 			}
 			else
-				memoryLayout.cacheWrite(curNode.block, curNode.compileLayout(true, memoryLayout), true, commands);
+				memoryLayout.cacheWrite(curNode.block, curNode.compileLayout(), true, commands);
 		}
-
-	}, [&](bool didReverse)
-	{
-		const NetworkNode & curNode = didReverse ? secNode : firstNode;
-		return curNode.compileLayout(false, memoryLayout);
-
 	}, memoryLayout, commands, true);
 }
 
@@ -337,5 +309,5 @@ void Scheduler::pullDataToNode(const NetworkNode & node, VirtualMemory & memoryL
 	commands.insertCommand({ERASE, node.block});
 
 	//Then write the final layout
-	memoryLayout.writeTaggedToBlock(node.block, node.compileLayout(true, memoryLayout), commands, false);
+	memoryLayout.writeTaggedToBlock(node.block, node.compileLayout(), commands, false);
 }

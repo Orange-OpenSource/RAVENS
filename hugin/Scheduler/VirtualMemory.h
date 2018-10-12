@@ -139,7 +139,6 @@ struct TranslationTable
 {
 	unordered_map<BlockID, DetailedBlock> translationData;
 	vector<DetailedBlockMetadata> translationsToPerform;
-	unordered_set<BlockID> impactOfTranslationToPerform;
 
 	TranslationTable(const vector<Block> &blocks)
 	{
@@ -171,23 +170,11 @@ struct TranslationTable
 		}
 	}
 
-	void splitAtIndex(const Address & destinationToMatch, size_t length)
-	{
-		auto translationArray = translationData.find(destinationToMatch.getBlock());
-		if(translationArray != translationData.end())
-		{
-			translationArray->second.splitAtIndex(translationArray->second.segments, destinationToMatch, length);
-		}
-	}
-
-	//We can't perform redirections one by one due to the risk of the cache origin becoming inconsistent
-	//Basically, if we do that and overwrite the source of the data, writes would confuse the (obsolete) data in cache and the fresh data
+	//FIXME: Get rid of staggered redirects as they don't really serve any purpose nowadays
 	void staggeredRedirect(const Address &addressToRedirect, size_t length, const Address &newBaseAddress)
 	{
 		assert(length > 0);
 		translationsToPerform.emplace_back(DetailedBlockMetadata(newBaseAddress, addressToRedirect, length, true));
-		impactOfTranslationToPerform.insert(addressToRedirect.getBlock());
-		splitAtIndex(addressToRedirect, length);
 	}
 
 	void performRedirect()
@@ -196,7 +183,7 @@ struct TranslationTable
 		{
 			const BlockID & block = translation.destination.getBlock();
 
-			//We ignore redirections for data outside the graph/network
+			//We ignore redirections for data outside the network
 
 			auto translationArray = translationData.find(block);
 			if(translationArray != translationData.end())
@@ -208,7 +195,6 @@ struct TranslationTable
 		}
 
 		translationsToPerform.clear();
-		impactOfTranslationToPerform.clear();
 	}
 
 	void translateSegment(Address from, size_t length, function<void(const Address&, const size_t)>processing) const
@@ -293,7 +279,6 @@ struct VirtualMemory
 	//Destination is the virtual address
 	TranslationTable translationTable;
 
-	bool hasCache;
 	CacheMemory tmpLayout;
 
 	bool hasCachedWrite;
@@ -301,24 +286,17 @@ struct VirtualMemory
 	BlockID cachedWriteBlock;
 	DetailedBlock cachedWriteRequest;
 
-	VirtualMemory(const vector<Block> &blocks) : tmpLayout(), translationTable(blocks), hasCache(false), hasCachedWrite(false), cachedWriteBlock(TMP_BUF), cachedWriteRequest() {}
+	VirtualMemory(const vector<Block> &blocks) : tmpLayout(), translationTable(blocks), hasCachedWrite(false), cachedWriteBlock(TMP_BUF), cachedWriteRequest() {}
 
-	VirtualMemory(const vector<Block> &blocks, const vector<size_t> &indexes) : tmpLayout(), translationTable(blocks, indexes), hasCache(false), hasCachedWrite(false), cachedWriteBlock(TMP_BUF), cachedWriteRequest() {}
+	VirtualMemory(const vector<Block> &blocks, const vector<size_t> &indexes) : tmpLayout(), translationTable(blocks, indexes), hasCachedWrite(false), cachedWriteBlock(TMP_BUF), cachedWriteRequest() {}
 
 	void performRedirect()
 	{
 		translationTable.performRedirect();
 	}
 
-	void didComplexLoadInCache(const CacheMemory &newTmpLayout)
-	{
-		hasCache = true;
-		tmpLayout = newTmpLayout;
-	}
-
 	void flushCache()
 	{
-		hasCache = false;
 		tmpLayout.flush();
 	}
 
@@ -330,12 +308,25 @@ struct VirtualMemory
 		});
 	}
 
-	void _generateCopyWithTranslatedAddress(const Address &realFrom, size_t length, Address toward, bool unTagCache, function<void(const Address &, const size_t, const Address &)> lambda)
+	void generateCopyWithTranslatedAddress(const Address &realFrom, size_t length, Address toward, bool unTagCache, function<void(const Address &, const size_t, const Address &)> lambda)
 	{
 		//Is the data in the cache?
 		if (realFrom.getBlock() == TMP_BUF)
 		{
-			assert(hasCache);
+#ifdef VERY_AGGRESSIVE_ASSERT
+			{
+				bool hasCache = false;
+				for(const auto & cacheToken : tmpLayout.segments)
+				{
+					if(cacheToken.tagged)
+					{
+						hasCache = true;
+						break;
+					}
+				}
+				assert(hasCache);
+			}
+#endif
 			
 			//The logic is fairly straightforward. We copy the data from the cache, then untag it if necessary
 			lambda(realFrom, length, toward);
@@ -384,14 +375,6 @@ struct VirtualMemory
 		}
 	}
 
-	void generateCopyWithTranslatedAddress(const Address &realFrom, const size_t &length, Address toward, SchedulerData &commands, bool ignoreCache, bool unTagCache = false)
-	{
-		_generateCopyWithTranslatedAddress(realFrom, length, toward, unTagCache, [&commands](const Address & from, const size_t length, const Address & toward)
-		{
-			commands.insertCommand({COPY, from, length, toward});
-		});
-	}
-
 	struct LocalMetadata
 	{
 		Address virtualSource;
@@ -422,7 +405,7 @@ struct VirtualMemory
 					//Is in cache?
 					if(subSection.tagged)
 					{
-						_generateCopyWithTranslatedAddress(subSection.source, subSection.length, Address(destination, offset), true, [&](const Address & from, const size_t length, const Address & toward) {
+						generateCopyWithTranslatedAddress(subSection.source, subSection.length, Address(destination, offset), true, [&](const Address & from, const size_t length, const Address & toward) {
 							assert(length > 0 && sourceOffset + length <= segment.length);
 
 							canonicalCopy.emplace_back(LocalMetadata(segment.source + sourceOffset, from, toward, length));
@@ -434,7 +417,7 @@ struct VirtualMemory
 					else
 					{
 						translationTable.translateSegment(subSection.source, subSection.length, [&](const Address& translatedFrom, const size_t translatedLength) {
-							_generateCopyWithTranslatedAddress(translatedFrom, translatedLength, Address(destination, offset), true, [&](const Address & from, const size_t length, const Address & toward) {
+							generateCopyWithTranslatedAddress(translatedFrom, translatedLength, Address(destination, offset), true, [&](const Address & from, const size_t length, const Address & toward) {
 								canonicalCopy.emplace_back(LocalMetadata(segment.source + sourceOffset, from, toward, length));
 								
 								sourceOffset += length;

@@ -382,11 +382,10 @@ namespace Scheduler
 	void removeNetworks(vector<Block> & blocks, SchedulerData & commands);
 
 	typedef function<void(const BlockID&, bool, VirtualMemory&, SchedulerData&)> SwapOperator;
-	typedef function<DetailedBlock(bool)> FirstNodeLayoutGenerator;
 
 	//Codegen utils
 	void halfSwapCodeGeneration(NetworkNode & firstNode, NetworkNode & secNode, VirtualMemory & memoryLayout, SchedulerData & commands);
-	void partialSwapCodeGeneration(const NetworkNode & firstNode, const NetworkNode & secNode, SwapOperator swapOperator, FirstNodeLayoutGenerator firstNodeLayout, VirtualMemory & memoryLayout, SchedulerData & commands, bool canReorder);
+	void partialSwapCodeGeneration(const NetworkNode & firstNode, const NetworkNode & secNode, SwapOperator swapOperator, VirtualMemory & memoryLayout, SchedulerData & commands, bool canReorder);
 	void reorderingSwapCodeGeneration(NetworkNode & firstNode, NetworkNode & secondaryNode, VirtualMemory & memoryLayout, SchedulerData & commands);
 	void networkSwapCodeGeneration(const NetworkNode & firstNode, const NetworkNode & secNode, VirtualMemory & memoryLayout, SchedulerData & commands);
 	void pullDataToNode(const NetworkNode & node, VirtualMemory & memoryLayout, SchedulerData & commands);

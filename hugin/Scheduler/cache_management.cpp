@@ -251,7 +251,11 @@ void VirtualMemory::_loadTaggedToTMP(const DetailedBlock & dataToLoad, Scheduler
 			size_t segmentShift = 0;
 			iterateTranslatedSegments(segment.source, segment.length, [&](const Address & translation, const size_t &length)
 			{
-				generateCopyWithTranslatedAddress(translation, length, tmpBuffer + segmentShift, commands, false, false);
+				generateCopyWithTranslatedAddress(translation, length, tmpBuffer + segmentShift, false, [&commands](const Address & from, const size_t translatedLength, const Address & toward)
+				{
+					commands.insertCommand({COPY, from, translatedLength, toward});
+				});
+
 				
 				//We mark from where the data come from
 				tmpLayoutCopy.insertNewSegment({segment.source + segmentShift, tmpBuffer + segmentShift, length, true});
@@ -357,10 +361,7 @@ void VirtualMemory::_loadTaggedToTMP(const DetailedBlock & dataToLoad, Scheduler
 
 void VirtualMemory::loadTaggedToTMP(const DetailedBlock & dataToLoad, SchedulerData & commands)
 {
-	if(!hasCache)
-		didComplexLoadInCache(CacheMemory());
-	else
-		tmpLayout.trimUntagged();
+	tmpLayout.trimUntagged();
 
 #ifdef VERY_AGGRESSIVE_ASSERT
 	//We check if we have enough room in the cache to load our data
