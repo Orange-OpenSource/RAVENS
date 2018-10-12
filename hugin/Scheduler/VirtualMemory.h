@@ -20,8 +20,8 @@
 
 struct CacheMemory : public DetailedBlock
 {
-	CacheMemory() : DetailedBlock(TMP_BUF) {}
-	CacheMemory(const BlockID & block) : DetailedBlock(TMP_BUF)
+	CacheMemory() : DetailedBlock(CACHE_BUF) {}
+	CacheMemory(const BlockID & block) : DetailedBlock(CACHE_BUF)
 	{
 		segments.front().source = {block, 0};
 	}
@@ -36,7 +36,7 @@ struct CacheMemory : public DetailedBlock
 	void flush()
 	{
 		segments.clear();
-		segments.emplace_back(DetailedBlockMetadata(TMP_BUF, BLOCK_SIZE));
+		segments.emplace_back(DetailedBlockMetadata(CACHE_BUF, BLOCK_SIZE));
 	}
 
 	bool isEmpty() const
@@ -279,16 +279,16 @@ struct VirtualMemory
 	//Destination is the virtual address
 	TranslationTable translationTable;
 
-	CacheMemory tmpLayout;
+	CacheMemory cacheLayout;
 
 	bool hasCachedWrite;
 	bool cachedWriteIgnoreLayout;
 	BlockID cachedWriteBlock;
 	DetailedBlock cachedWriteRequest;
 
-	VirtualMemory(const vector<Block> &blocks) : tmpLayout(), translationTable(blocks), hasCachedWrite(false), cachedWriteBlock(TMP_BUF), cachedWriteRequest() {}
+	VirtualMemory(const vector<Block> &blocks) : cacheLayout(), translationTable(blocks), hasCachedWrite(false), cachedWriteBlock(CACHE_BUF), cachedWriteRequest() {}
 
-	VirtualMemory(const vector<Block> &blocks, const vector<size_t> &indexes) : tmpLayout(), translationTable(blocks, indexes), hasCachedWrite(false), cachedWriteBlock(TMP_BUF), cachedWriteRequest() {}
+	VirtualMemory(const vector<Block> &blocks, const vector<size_t> &indexes) : cacheLayout(), translationTable(blocks, indexes), hasCachedWrite(false), cachedWriteBlock(CACHE_BUF), cachedWriteRequest() {}
 
 	void performRedirect()
 	{
@@ -297,7 +297,7 @@ struct VirtualMemory
 
 	void flushCache()
 	{
-		tmpLayout.flush();
+		cacheLayout.flush();
 	}
 
 	void translateSegment(Address from, size_t length, vector<DetailedBlockMetadata> & output) const
@@ -311,12 +311,12 @@ struct VirtualMemory
 	void generateCopyWithTranslatedAddress(const Address &realFrom, size_t length, Address toward, bool unTagCache, function<void(const Address &, const size_t, const Address &)> lambda)
 	{
 		//Is the data in the cache?
-		if (realFrom.getBlock() == TMP_BUF)
+		if (realFrom.getBlock() == CACHE_BUF)
 		{
 #ifdef VERY_AGGRESSIVE_ASSERT
 			{
 				bool hasCache = false;
-				for(const auto & cacheToken : tmpLayout.segments)
+				for(const auto & cacheToken : cacheLayout.segments)
 				{
 					if(cacheToken.tagged)
 					{
@@ -333,9 +333,9 @@ struct VirtualMemory
 			
 			if(unTagCache)
 			{
-				auto search = lower_bound(tmpLayout.segments.begin(), tmpLayout.segments.end(), realFrom, [](const DetailedBlockMetadata & meta, const Address & from) { return meta.destination <= from; });
+				auto search = lower_bound(cacheLayout.segments.begin(), cacheLayout.segments.end(), realFrom, [](const DetailedBlockMetadata & meta, const Address & from) { return meta.destination <= from; });
 				
-				assert(search != tmpLayout.segments.begin());
+				assert(search != cacheLayout.segments.begin());
 				search -= 1;
 				assert(search->destination <= realFrom);
 				
@@ -356,7 +356,7 @@ struct VirtualMemory
 
 				assert(length == 0);
 				for(const auto & untag : untagSegments)
-					tmpLayout.insertNewSegment(untag);
+					cacheLayout.insertNewSegment(untag);
 			}
 		}
 		else
@@ -365,7 +365,7 @@ struct VirtualMemory
 
 	void applyCacheWillUntag()
 	{
-		for (auto &tmpSegment : tmpLayout.segments)
+		for (auto &tmpSegment : cacheLayout.segments)
 		{
 			if(tmpSegment.tagged && tmpSegment.willUntag)
 			{
@@ -399,7 +399,7 @@ struct VirtualMemory
 			{
 				//We detect whether part of the segment are in the cache. If so, no need to translate
 				size_t sourceOffset = 0;
-				const auto arePartsInCache = tmpLayout.segmentInCache(segment.source, segment.length);
+				const auto arePartsInCache = cacheLayout.segmentInCache(segment.source, segment.length);
 				for(const auto & subSection : arePartsInCache)
 				{
 					//Is in cache?
@@ -442,10 +442,10 @@ struct VirtualMemory
 			{
 				if(a.source.getBlock() != b.source.getBlock())
 				{
-					if(a.source == TMP_BUF.getBlock())
+					if(a.source == CACHE_BUF.getBlock())
 						return true;
 
-					else if(b.source == TMP_BUF.getBlock())
+					else if(b.source == CACHE_BUF.getBlock())
 						return false;
 				}
 
@@ -509,7 +509,7 @@ struct VirtualMemory
 			hasCachedWrite = false;
 
 #ifdef VERY_AGGRESSIVE_ASSERT
-			for(const auto & segment : tmpLayout.segments)
+			for(const auto & segment : cacheLayout.segments)
 				assert(!segment.tagged);
 #endif
 		}

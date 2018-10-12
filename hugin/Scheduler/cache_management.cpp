@@ -75,7 +75,7 @@ void buildWriteCommandToFlushCacheFromNodes(const vector<NetworkNode> & nodes, c
 			{
 				//Get the section NOT in the cache
 				vector<DetailedBlockMetadata> sectionNotPresent;
-				extractSubSectionToLoad(segment, virtualMemory.tmpLayout, sectionNotPresent);
+				extractSubSectionToLoad(segment, virtualMemory.cacheLayout, sectionNotPresent);
 
 				//If everything is, that's simpler
 				if(sectionNotPresent.empty())
@@ -167,7 +167,7 @@ void VirtualMemory::_retagReusedToken(vector<DetailedBlockMetadata> & sortedToke
 
 void VirtualMemory::_loadTaggedToTMP(const DetailedBlock & dataToLoad, SchedulerData & commands)
 {
-	CacheMemory tmpLayoutCopy = tmpLayout;
+	CacheMemory tmpLayoutCopy = cacheLayout;
 	commands.newTransaction();
 	
 	vector<DetailedBlockMetadata> sortedChunks;
@@ -204,7 +204,7 @@ void VirtualMemory::_loadTaggedToTMP(const DetailedBlock & dataToLoad, Scheduler
 				//Restart the iterator and make room
 				tmpSegment = tmpLayoutCopy.segments.begin();
 
-				//Make the necessary room in TMP_BUF
+				//Make the necessary room in CACHE_BUF
 				//If data in use or if we're done with the current segment
 				while((tmpSegment->tagged || tmpSegment->length == 0) && tmpSegment != tmpLayoutCopy.segments.end())
 					tmpSegment += 1;
@@ -261,25 +261,25 @@ void VirtualMemory::_loadTaggedToTMP(const DetailedBlock & dataToLoad, Scheduler
 				segmentShift += length;
 			});
 
-			//We must NEVER excess the capacity of TMP_BUF)
+			//We must NEVER excess the capacity of CACHE_BUF)
 			assert(tmpLayoutCopy.availableRoom() >= 0);
 		}
 	}
 
 	commands.finishTransaction();
-	tmpLayout = tmpLayoutCopy;
+	cacheLayout = tmpLayoutCopy;
 }
 
 void VirtualMemory::loadTaggedToTMP(const DetailedBlock & dataToLoad, SchedulerData & commands)
 {
-	tmpLayout.trimUntagged();
+	cacheLayout.trimUntagged();
 
 #ifdef VERY_AGGRESSIVE_ASSERT
 	//We check if we have enough room in the cache to load our data
 	size_t lengthAlreadyInCache = 0, lengthToFitInCache = 0;
 
 	//Room already in use
-	for(const auto & segment : tmpLayout.segments)
+	for(const auto & segment : cacheLayout.segments)
 	{
 		if(segment.tagged)
 			lengthAlreadyInCache += segment.length;
@@ -292,7 +292,7 @@ void VirtualMemory::loadTaggedToTMP(const DetailedBlock & dataToLoad, SchedulerD
 		{
 			//We might have some duplicate
 			vector<DetailedBlockMetadata> subSegments;
-			extractSubSectionToLoad(segment, tmpLayout, subSegments);
+			extractSubSectionToLoad(segment, cacheLayout, subSegments);
 
 			for(const auto & subSegment : subSegments)
 				lengthToFitInCache += subSegment.length;

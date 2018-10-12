@@ -173,7 +173,7 @@ bool NetworkNode::dispatchInNodes(NetworkNode & node1, NetworkNode & node2)
 	size_t lengthToAllocate = getOccupationLevel();
 	vector<pair<size_t, size_t>> spaceLeftAfterward;
 	bool needReloop, didReloopOnce = false;
-	BlockID reloopSource(TMP_BUF), reloopDest(TMP_BUF);
+	BlockID reloopSource(CACHE_BUF), reloopDest(CACHE_BUF);
 
 	assert(lengthToAllocate <= 2 * BLOCK_SIZE);
 
