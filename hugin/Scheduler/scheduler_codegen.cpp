@@ -215,28 +215,8 @@ void Scheduler::reorderingSwapCodeGeneration(NetworkNode & firstNode, NetworkNod
 	if(!isFirstFinal)
 		memoryLayout.writeTaggedToBlock(first, (didReverse ? secondaryNode : firstNode).blockFinalLayout, commands);
 
-	/// We trust the rest of the code to empty the cache it used. This is supposed to be a closed loop so it shouldn't be a problem
-
 	//We then decide which data is interesting
-	//FIXME: Could we use extractDataNecessaryInSecondary?
-	DetailedBlock dataToLoad(second);
-	for(const auto & netToken : (didReverse ? firstNode : secondaryNode).tokens)
-	{
-		if(netToken.cleared || netToken.destinationBlockID == first)
-			continue;
-
-		for(const auto & token : netToken.sourceToken)
-		{
-			size_t shift = 0;
-			memoryLayout.iterateTranslatedSegments(token.origin, token.length, [&](const Address & translatedAddress, const size_t translatedLength)
-			{
-				//We may want to ignore segment if they're referring to duplicated data
-				if(translatedAddress == second)
-					dataToLoad.insertNewSegment(DetailedBlockMetadata(token.origin + shift, translatedLength, true));
-				shift += translatedLength;
-			});
-		}
-	}
+	DetailedBlock dataToLoad = extractDataNecessaryInSecondary(memoryLayout, {didReverse ? firstNode : secondaryNode}, second);
 
 #ifdef IGNORE_CACHE_LAYOUT
 	//We really don't care about the layout in the cache of the data we're loading so we're offering an opportunity for sequential load
