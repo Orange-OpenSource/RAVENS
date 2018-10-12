@@ -292,7 +292,7 @@ struct NetworkNode
 				size_t tokenOffset = 0;
 				//We may have final token that migrated in us while we were not ready to turn final.
 				//In this case, we need to add a token so that we can protect against duplicates
-				memoryLayout.iterateTranslatedSegments(token.source, token.length, [&](const Address & source, const size_t length, bool)
+				memoryLayout.iterateTranslatedSegments(token.source, token.length, [&](const Address & source, const size_t length)
 				{
 					if(source == block)
 					{

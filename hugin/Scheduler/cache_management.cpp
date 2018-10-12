@@ -12,7 +12,7 @@
 
 #include "scheduler.h"
 
-void extractSubSectionToLoad(const DetailedBlockMetadata & toExtract, const CacheMemory & cache, const VirtualMemory & virtualMemory, bool noTranslation, vector<DetailedBlockMetadata> & output)
+void extractSubSectionToLoad(const DetailedBlockMetadata & toExtract, const CacheMemory & cache, vector<DetailedBlockMetadata> & output)
 {
 	output.emplace_back(toExtract);
 
@@ -25,68 +25,32 @@ void extractSubSectionToLoad(const DetailedBlockMetadata & toExtract, const Cach
 		{
 			auto & originalSegment = output[index];
 
-			//Translate the segment
-			vector<DetailedBlockMetadata> translatedSegment;
-			if(noTranslation)
-				translatedSegment.emplace_back(originalSegment);
-			else
-				virtualMemory.translateSegment(originalSegment.source, originalSegment.length, translatedSegment);
-
-			bool didUntag = false;
-			size_t translationLength = 0;
-			for(auto & segment : translatedSegment)
+			// We're not tagging segments that are now in use. Might be a problem but would generate a ton of noise for _loadTaggedToTMP
+			if(curTmp.overlapWith(originalSegment.source, originalSegment.length))
 			{
-				// We're not tagging segments that are now in use. Might be a problem but would generate a ton of noise for _loadTaggedToTMP
-				if(curTmp.overlapWith(segment.source, segment.length))
+				//Partial overlap?
+				if(curTmp.source > originalSegment.source || curTmp.source + curTmp.length < originalSegment.source + originalSegment.length)
 				{
-					//Partial overlap?
-					if(curTmp.source > segment.source || curTmp.source + curTmp.length < segment.source + segment.length)
+					//We're starting before, so we add back the segment before the match
+					if(originalSegment.source < curTmp.source)
 					{
-						//We're starting before, so we add back the segment before the match
-						if(segment.source < curTmp.source)
-						{
-							output.emplace_back(DetailedBlockMetadata(output[index].source + translationLength, curTmp.source.getAddress() - segment.source.getAddress()));
-							outputLength += 1;
-						}
-
-						//We're finishing after, so we add the segment after the match
-						if(segment.source + segment.length > curTmp.source + curTmp.length)
-						{
-							const size_t offsetCacheEndToTranslation = (curTmp.source.value + curTmp.length) - segment.source.value;
-							output.emplace_back(DetailedBlockMetadata(output[index].source + translationLength + offsetCacheEndToTranslation,
-																	  segment.source.value + segment.length - (curTmp.source.value + curTmp.length)));
-							outputLength += 1;
-						}
-					}
-
-					segment.tagged = false;
-					didUntag = true;
-				}
-				else
-					segment.tagged = true;
-
-				translationLength += segment.length;
-			}
-
-			//If we removed sections of the segment, we must remove/fragment the output
-			if(didUntag)
-			{
-				auto original = output[index];
-				size_t length = 0;
-
-				output.erase(output.begin() + index);
-				outputLength -= 1;
-
-				for(const auto & translation : translatedSegment)
-				{
-					if(translation.tagged)
-					{
-						output.insert(output.begin() + index++, DetailedBlockMetadata(original.source + length, original.destination + length, translation.length, true));
+						output.emplace_back(DetailedBlockMetadata(output[index].source, curTmp.source.getAddress() - originalSegment.source.getAddress()));
 						outputLength += 1;
 					}
-
-					length += translation.length;
+					
+					//We're finishing after, so we add the segment after the match
+					if(originalSegment.source + originalSegment.length > curTmp.source + curTmp.length)
+					{
+						const size_t offsetCacheEndToTranslation = (curTmp.source.value + curTmp.length) - originalSegment.source.value;
+						output.emplace_back(DetailedBlockMetadata(output[index].source + offsetCacheEndToTranslation,
+																  originalSegment.source.value + originalSegment.length - (curTmp.source.value + curTmp.length)));
+						outputLength += 1;
+					}
 				}
+
+				//If we removed sections of the segment, we must remove the initial segment from output
+				output.erase(output.begin() + index);
+				outputLength -= 1;
 
 				if(outputLength == 0)
 					return;
@@ -97,6 +61,7 @@ void extractSubSectionToLoad(const DetailedBlockMetadata & toExtract, const Cach
 	}
 }
 
+//FIXME: this is unecessary and should be dramatically simplified
 void buildWriteCommandToFlushCacheFromNodes(const vector<NetworkNode> & nodes, const VirtualMemory & virtualMemory, const BlockID & destination, DetailedBlock & commands)
 {
 	for(const auto & node : nodes)
@@ -110,7 +75,7 @@ void buildWriteCommandToFlushCacheFromNodes(const vector<NetworkNode> & nodes, c
 			{
 				//Get the section NOT in the cache
 				vector<DetailedBlockMetadata> sectionNotPresent;
-				extractSubSectionToLoad(segment, virtualMemory.tmpLayout, virtualMemory, false, sectionNotPresent);
+				extractSubSectionToLoad(segment, virtualMemory.tmpLayout, sectionNotPresent);
 
 				//If everything is, that's simpler
 				if(sectionNotPresent.empty())
@@ -167,20 +132,56 @@ void buildWriteCommandToFlushCacheFromNodes(const vector<NetworkNode> & nodes, c
 	}
 }
 
+void VirtualMemory::_sortBySortedAddress(const DetailedBlock & dataToLoad, vector<DetailedBlockMetadata> & output)
+{
+	if(dataToLoad.segments.size() == 1)
+	{
+		output = dataToLoad.segments;
+		return;
+	}
+	
+	output.clear();
+	output.reserve(dataToLoad.segments.size());
+	
+	for(auto & segment : dataToLoad.segments)
+	{
+		if(!segment.tagged)
+			continue;
+		
+		size_t offset = 0;
+		iterateTranslatedSegments(segment.source, segment.length, [&](const Address & translation, const size_t &length)
+		{
+			output.emplace_back(segment.source + offset, translation, length, true);
+			offset += length;
+		});
+	}
+	
+	sort(output.begin(), output.end(), [](const DetailedBlockMetadata & a, const DetailedBlockMetadata & b) { return a.destination < b.destination; });
+}
+
+void VirtualMemory::_retagReusedToken(vector<DetailedBlockMetadata> & sortedTokenWithTranslation)
+{
+	//It may be interesting to retag token already in the cache so that we don't generate unecessary COPYs
+#warning "To Implement"
+}
+
 #ifdef TMP_STRATEGY_PROGRESSIVE
-void VirtualMemory::_loadTaggedToTMP(const DetailedBlock & dataToLoad, SchedulerData & commands, bool noTranslation)
+void VirtualMemory::_loadTaggedToTMP(const DetailedBlock & dataToLoad, SchedulerData & commands)
 {
 	CacheMemory tmpLayoutCopy = tmpLayout;
 	commands.newTransaction();
+	
+	vector<DetailedBlockMetadata> sortedChunks;
+	_sortBySortedAddress(dataToLoad, sortedChunks);
 
-	for (const auto &realSegment : dataToLoad.segments)
+	for (const auto &realSegment : sortedChunks)
 	{
 		if (!realSegment.tagged)
 			continue;
 
 		//We determine precisely what we need to load
 		vector<DetailedBlockMetadata> subSegments;
-		extractSubSectionToLoad(realSegment, tmpLayoutCopy, *this, noTranslation, subSegments);
+		extractSubSectionToLoad(realSegment, tmpLayoutCopy, subSegments);
 
 		for(const auto & segment : subSegments)
 		{
@@ -246,31 +247,16 @@ void VirtualMemory::_loadTaggedToTMP(const DetailedBlock & dataToLoad, Scheduler
 				}
 			}
 
-			if(noTranslation)
+			Address tmpBuffer = tmpSegment->destination;
+			size_t segmentShift = 0;
+			iterateTranslatedSegments(segment.source, segment.length, [&](const Address & translation, const size_t &length)
 			{
-				if (segment.source.getOffset() == 0 && segment.length == BLOCK_SIZE && tmpLayoutCopy.isEmpty())
-					commands.insertCommand({COPY, segment.source, segment.length, TMP_BUF});
-				else
-					commands.insertCommand({COPY, segment.source, segment.length, tmpSegment->destination});
-
+				generateCopyWithTranslatedAddress(translation, length, tmpBuffer + segmentShift, commands, false, false);
+				
 				//We mark from where the data come from
-				tmpLayoutCopy.insertNewSegment({segment.source, tmpSegment->destination, segment.length, true});
-			}
-			else
-			{
-				Address tmpBuffer = tmpSegment->destination;
-				iterateTranslatedSegments(segment.source, segment.length, [&](const Address & address, const size_t length, bool ignoreCache)
-				{
-					if (address.getOffset() == 0 && length == BLOCK_SIZE && tmpLayoutCopy.isEmpty())
-						commands.insertCommand({COPY, segment.source, segment.length, TMP_BUF});
-					else
-						generateCopyWithTranslatedAddress(address, length, tmpBuffer, commands, ignoreCache, false);
-
-					//We mark from where the data come from
-					tmpLayoutCopy.insertNewSegment({address, tmpBuffer, length, true});
-					tmpBuffer += length;
-				});
-			}
+				tmpLayoutCopy.insertNewSegment({segment.source + segmentShift, tmpBuffer + segmentShift, length, true});
+				segmentShift += length;
+			});
 
 			//We must NEVER excess the capacity of TMP_BUF)
 			assert(tmpLayoutCopy.availableRoom() >= 0);
@@ -323,7 +309,7 @@ void trimUntaggedSpaceInTmp(CacheMemory & tmpLayout, SchedulerData & commands)
 	tmpLayout.compactSegments();
 }
 
-void VirtualMemory::_loadTaggedToTMP(const DetailedBlock & dataToLoad, SchedulerData & commands, bool noTranslation)
+void VirtualMemory::_loadTaggedToTMP(const DetailedBlock & dataToLoad, SchedulerData & commands)
 {
 	CacheMemory tmpLayoutCopy = tmpLayout;
 	trimUntaggedSpaceInTmp(tmpLayoutCopy, commands);
@@ -369,7 +355,7 @@ void VirtualMemory::_loadTaggedToTMP(const DetailedBlock & dataToLoad, Scheduler
 }
 #endif
 
-void VirtualMemory::loadTaggedToTMP(const DetailedBlock & dataToLoad, SchedulerData & commands, bool noTranslation)
+void VirtualMemory::loadTaggedToTMP(const DetailedBlock & dataToLoad, SchedulerData & commands)
 {
 	if(!hasCache)
 		didComplexLoadInCache(CacheMemory());
@@ -394,7 +380,7 @@ void VirtualMemory::loadTaggedToTMP(const DetailedBlock & dataToLoad, SchedulerD
 		{
 			//We might have some duplicate
 			vector<DetailedBlockMetadata> subSegments;
-			extractSubSectionToLoad(segment, tmpLayout, *this, noTranslation, subSegments);
+			extractSubSectionToLoad(segment, tmpLayout, subSegments);
 
 			for(const auto & subSegment : subSegments)
 				lengthToFitInCache += subSegment.length;
@@ -406,5 +392,5 @@ void VirtualMemory::loadTaggedToTMP(const DetailedBlock & dataToLoad, SchedulerD
 	assert(lengthAlreadyInCache + lengthToFitInCache <= BLOCK_SIZE);
 #endif
 
-	_loadTaggedToTMP(dataToLoad, commands, noTranslation);
+	_loadTaggedToTMP(dataToLoad, commands);
 }

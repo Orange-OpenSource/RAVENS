@@ -372,7 +372,7 @@ DetailedBlock NetworkNode::compileLayout(bool wantWriteLayout, const VirtualMemo
 				if(!wantWriteLayout && isOversizedSelfReference)
 				{
 					size_t processedLength = 0;
-					memoryLayout.iterateTranslatedSegments(token.origin, token.length, [&](const Address & from, const size_t length, bool) {
+					memoryLayout.iterateTranslatedSegments(token.origin, token.length, [&](const Address & from, const size_t length) {
 						if(from == block)
 						{
 							const bool result = output.fitSegmentInUntagged({Token(token.origin + processedLength, length, token.origin + processedLength), true});
@@ -916,6 +916,8 @@ void Network::pulledEverythingForNode(NetworkNode & node)
 			//Clear all token toward us
 			for(auto & token : networkNode.tokens)
 			{
+				//FIXME: we don't look for token we siphoned when turning final which were not explicitely aimed at us (because the data is duplicated)
+				//	The cheapest fix would likely to cache the blocks with incomming data when turning final, but before the VM is updated
 				if(!token.cleared && token.destinationBlockID == node.block)
 				{
 					//We may have a token due to an internal transfer
