@@ -131,7 +131,6 @@ void Scheduler::partialSwapCodeGeneration(const NetworkNode & firstNode, const N
 		memoryLayout.commitCachedWrite(commands);
 
 		DetailedBlock necessaryDataInSecondary = extractDataNecessaryInSecondary(memoryLayout, {firstNode, secNode}, secondBlockID);
-		memoryLayout.flushCache();
 
 		//We can load the data in CACHE_BUF
 		memoryLayout.loadTaggedToTMP(necessaryDataInSecondary, commands);
