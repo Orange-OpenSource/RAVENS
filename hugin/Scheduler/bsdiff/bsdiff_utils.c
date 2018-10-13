@@ -138,14 +138,14 @@ static void split(off_t *index, off_t *value, off_t start, off_t matchLength, of
 	}
 }
 
-void qsufsort(off_t *index, off_t *value, const u_char *old, size_t oldSize)
+void qsufsort(off_t *index, off_t *value, const uint8_t *old, off_t oldSize)
 {
 	off_t buckets[256];
 
 	//Count the number of hit in each bucket, sum them upward (each bucket has the number of hit in bucket <= to it, then drop the last one)
 	memset(buckets, 0, sizeof(buckets));
 
-	for (size_t i = 0; i < oldSize; i++)
+	for (off_t i = 0; i < oldSize; i++)
 		buckets[old[i]] += 1;
 
 	for (size_t i = 1; i < 256; i++)
@@ -159,7 +159,7 @@ void qsufsort(off_t *index, off_t *value, const u_char *old, size_t oldSize)
 
 	//Write to index the sorted rank of each value in old
 	// 	(buckets[old[i]] is the number of time the value old[i] as been met + the base offset of the value, i.e. the number of occurences of values < itself)
-	for (size_t i = 0; i < oldSize; i++)
+	for (off_t i = 0; i < oldSize; i++)
 		index[++buckets[old[i]]] = i;
 
 	//Write to `value` the number of bytes <= to old[i]
@@ -216,11 +216,11 @@ void qsufsort(off_t *index, off_t *value, const u_char *old, size_t oldSize)
 		index[value[i]] = i;
 }
 
-static size_t matchlen(const u_char *old, off_t oldSize, const u_char *newer, off_t newSize)
+static size_t matchlen(const uint8_t *old, off_t oldSize, const uint8_t *newer, off_t newSize)
 {
 	size_t i;
 
-	for (i = 0; i < oldSize && i < newSize; i++)
+	for (i = 0; i < (size_t) oldSize && i < (size_t) newSize; i++)
 	{
 		if (old[i] != newer[i])
 			break;
@@ -260,7 +260,7 @@ size_t search(off_t *index, const uint8_t *old, size_t oldSize, const uint8_t *n
 	}
 }
 
-void offtout(uint32_t x, u_char * buf)
+void offtout(uint32_t x, uint8_t * buf)
 {
 	buf[0] = x			& 0xffu;
 	buf[1] = (x >> 8) 	& 0xffu;
@@ -299,7 +299,7 @@ uint8_t * readFile(const char * file, size_t * fileSize)
 		return NULL;
 	}
 
-	if(read(fd, output, *fileSize) != *fileSize)
+	if(read(fd, output, *fileSize) != (ssize_t) *fileSize)
 	{
 		warn("Couldn't read the file %s", file);
 		close(fd);
@@ -312,5 +312,5 @@ uint8_t * readFile(const char * file, size_t * fileSize)
 		return NULL;
 	}
 
-	return (u_char*) output;
+	return (uint8_t*) output;
 }

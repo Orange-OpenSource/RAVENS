@@ -271,9 +271,9 @@ struct VirtualMemory
 	BlockID cachedWriteBlock;
 	DetailedBlock cachedWriteRequest;
 
-	VirtualMemory(const vector<Block> &blocks) : cacheLayout(), translationTable(blocks), hasCachedWrite(false), cachedWriteBlock(CACHE_BUF), cachedWriteRequest() {}
+	VirtualMemory(const vector<Block> &blocks) : translationTable(blocks), cacheLayout(), hasCachedWrite(false), cachedWriteBlock(CACHE_BUF), cachedWriteRequest() {}
 
-	VirtualMemory(const vector<Block> &blocks, const vector<size_t> &indexes) : cacheLayout(), translationTable(blocks, indexes), hasCachedWrite(false), cachedWriteBlock(CACHE_BUF), cachedWriteRequest() {}
+	VirtualMemory(const vector<Block> &blocks, const vector<size_t> &indexes) : translationTable(blocks, indexes), cacheLayout(), hasCachedWrite(false), cachedWriteBlock(CACHE_BUF), cachedWriteRequest() {}
 
 	void flushCache()
 	{

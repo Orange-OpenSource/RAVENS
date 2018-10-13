@@ -36,7 +36,8 @@ struct NetworkNode
 	bool isFinal;
 	bool needRefreshLargestToken;
 
-	NetworkNode(const BlockID & curBlockID, const vector<NetworkToken> & allTokens) : block(curBlockID), sumOut(0), nbSourcesIn(0), nbSourcesOut(0), lengthFinalLayout(0), blockFinalLayout(curBlockID), largestToken(0), needRefreshLargestToken(false), isFinal(false)
+	NetworkNode(const BlockID & curBlockID, const vector<NetworkToken> & allTokens) : block(curBlockID), blockFinalLayout(curBlockID),
+				nbSourcesIn(0), nbSourcesOut(0), sumOut(0), lengthFinalLayout(0), largestToken(0), isFinal(false), needRefreshLargestToken(false)
 	{
 		//Very expensive,
 		for(const auto & token : allTokens)
@@ -47,10 +48,8 @@ struct NetworkNode
 #endif
 	}
 
-	NetworkNode(const Block & curBlock, const vector<NetworkToken> & allTokens) : block(curBlock.blockID), sumOut(0), nbSourcesIn(0), nbSourcesOut(0), lengthFinalLayout(0), blockFinalLayout(curBlock.blockID), largestToken(0), needRefreshLargestToken(false), isFinal(false)
-#ifdef PRINT_SELECTED_LINKS
-	,touchCount(0)
-#endif
+	NetworkNode(const Block & curBlock, const vector<NetworkToken> & allTokens) : block(curBlock.blockID), blockFinalLayout(curBlock.blockID),
+				nbSourcesIn(0), nbSourcesOut(0), sumOut(0), lengthFinalLayout(0), largestToken(0), isFinal(false), needRefreshLargestToken(false)
 	{
 		//We first import sourceID matches, allTokens are sorted by sourceID
 		auto startSourceID = lower_bound(allTokens.cbegin(), allTokens.cend(), block, [](const NetworkToken & a, const BlockID & b) { return a.sourceBlockID < b; });

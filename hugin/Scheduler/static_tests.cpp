@@ -10,13 +10,14 @@
  * @author Emile-Hugo Spir
  */
 
+#include <cstring>
 #include "scheduler.h"
 
 bool dynamicallyCheckStaticTest(const vector<PublicCommand> & real, const vector<BSDiffMoves> &input)
 {
 	assert(!input.empty());
 	
-	size_t min = SIZE_T_MAX, max = 0;
+	size_t min = SIZE_MAX, max = 0;
 	for(const auto & move : input)
 	{
 		if(move.start < min)

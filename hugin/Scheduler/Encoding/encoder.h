@@ -44,7 +44,7 @@ public:
 
 	size_t validate(const std::vector<PublicCommand> & commands);
 
-	Encoder() : blockIDBits(BLOCK_ID_SPACE), usingBlock(false), blockInUse(0), blockBase(0) {}
+	Encoder() : usingBlock(false), blockInUse(0), blockIDBits(BLOCK_ID_SPACE), blockBase(0) {}
 };
 
 #endif //SCHEDULER_ENCODER_H

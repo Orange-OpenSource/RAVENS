@@ -16,7 +16,7 @@
 #ifdef BSDIFF_PRIVATE
 extern "C"
 {
-	void qsufsort(off_t *index, off_t *value, const uint8_t *old, size_t oldSize);
+	void qsufsort(off_t *index, off_t *value, const uint8_t *old, off_t oldSize);
 	size_t search(off_t *index, const uint8_t *old, size_t oldSize, const uint8_t *newer, size_t newSize, size_t st, size_t en, size_t *matchPos);
 	void offtout(uint32_t x, uint8_t *buf);
 }

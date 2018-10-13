@@ -25,10 +25,10 @@ struct DetailedBlockMetadata
 
 	size_t length;
 
-	DetailedBlockMetadata(const BlockID & blockID, bool shouldTag = false) : source(blockID, 0), destination(blockID, 0), length(BLOCK_SIZE), tagged(shouldTag), willUntag(false) {}
-	DetailedBlockMetadata(const Address & address, const size_t length = BLOCK_SIZE, bool shouldTag = false) : source(address), destination(address), length(length), tagged(shouldTag), willUntag(false) {}
-	DetailedBlockMetadata(const Address & source, const Address & destination, const size_t length = BLOCK_SIZE, bool shouldTag = false) : source(source), destination(destination), length(length), tagged(shouldTag), willUntag(false) {}
-	DetailedBlockMetadata(const Token & token, bool shouldTag = false) : source(token.origin), destination(token.finalAddress), length(token.length), tagged(shouldTag), willUntag(false) {}
+	DetailedBlockMetadata(const BlockID & blockID, bool shouldTag = false) : source(blockID, 0), destination(blockID, 0), tagged(shouldTag), willUntag(false), length(BLOCK_SIZE) {}
+	DetailedBlockMetadata(const Address & address, const size_t length = BLOCK_SIZE, bool shouldTag = false) : source(address), destination(address), tagged(shouldTag), willUntag(false), length(length) {}
+	DetailedBlockMetadata(const Address & source, const Address & destination, const size_t length = BLOCK_SIZE, bool shouldTag = false) : source(source), destination(destination), tagged(shouldTag), willUntag(false), length(length) {}
+	DetailedBlockMetadata(const Token & token, bool shouldTag = false) : source(token.origin), destination(token.finalAddress), tagged(shouldTag), willUntag(false), length(token.length) {}
 
 	bool fitWithinDestination(const Address & needle) const
 	{
@@ -79,7 +79,7 @@ struct DetailedBlock
 		segments.reserve(0x20);
 	}
 
-	explicit DetailedBlock(const BlockID &blockID) : segments({blockID}), sorted(true)
+	explicit DetailedBlock(const BlockID &blockID) : sorted(true), segments({blockID})
 	{
 		segments.reserve(0x20);
 	}
