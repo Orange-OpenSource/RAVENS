@@ -596,7 +596,7 @@ void Network::performToken(NetworkNode & source, NetworkNode & destination, Sche
 	if(sourceCoreIter != tokenPool.end() && sourceCoreIter->destinationBlockID == source.block)
 	{
 		oldSource = *sourceCoreIter;
-        oldSource.removeInternalOverlap();
+		oldSource.removeInternalOverlap();
 		tokenPool.erase(sourceCoreIter);
 		hadSource = true;
 	}

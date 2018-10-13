@@ -51,10 +51,10 @@ DetailedBlock extractDataNecessaryInSecondary(const VirtualMemory & memoryLayout
  * In our configuration, as illustrated below, block B need `b` bytes of data from bloc A, etc...
  *
  * 	(A) - b -> (B)
- * 	 ↑			|
- * 	 |			c
- * 	 a			|
- * 	 |			↓
+ * 	 ↑          |
+ * 	 |          c
+ * 	 a          |
+ * 	 |          ↓
  * 	(D) <- d - (C)
  *
  * 	HS works by first looking for a specific patern and work on it. Specifically, three blocks (for instance, A, B and C) where the link
@@ -63,9 +63,9 @@ DetailedBlock extractDataNecessaryInSecondary(const VirtualMemory & memoryLayout
  *
  * 	(A) <- ≤ b - (B)
  * 	 ↑ \
- * 	 |	\
- * 	 a	 ↳ c --.
- * 	 |			↓
+ * 	 |  \
+ * 	 a   ↳ c --.
+ * 	 |          ↓
  * 	(D) <- d - (C)
  *
  * 	This new configuration effectively remove B from the cycle and thus the algorithm can be executed again until only two blocks are left in the cycle,

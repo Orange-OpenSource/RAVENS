@@ -36,13 +36,13 @@ bool dynamicallyCheckStaticTest(const vector<PublicCommand> & real, const vector
 	min &= BLOCK_MASK;
 	max &= BLOCK_MASK;
 	
-	size_t bufferLength = max - min + BLOCK_SIZE;
+	const size_t bufferLength = max;
 	uint8_t * buffer = (uint8_t*) malloc(bufferLength), *ref = (uint8_t*) malloc(bufferLength);
 	
 	assert(buffer != nullptr && ref != nullptr);
 	
 	//We only really want a non-repeating patern
-	for(size_t i = 0; i < bufferLength; ++i)
+	for(size_t i = min; i < bufferLength; ++i)
 		buffer[i] = ref[i] = rand() & 0xff;
 	
 	//The code better not _crash_ the VM
@@ -123,7 +123,7 @@ bool validateStaticResults(const vector<PublicCommand> &real, const vector<Comma
 			cout << endl;
 		}
 	}
-	
+
 	return !testFail;
 }
 
