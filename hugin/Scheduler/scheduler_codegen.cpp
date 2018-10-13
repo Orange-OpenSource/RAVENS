@@ -81,11 +81,15 @@ DetailedBlock extractDataNecessaryInSecondary(const VirtualMemory & memoryLayout
 //First has the largest outgoing link
 void Scheduler::halfSwapCodeGeneration(NetworkNode & firstNode, NetworkNode & secNode, VirtualMemory & memoryLayout, SchedulerData & commands)
 {
+	/*
+	 *	Although it would be pretty nice, we can't enable the node swap for HSwap in the current state of things.
+	 * This is because we don't really know what content goes where, and thus how to simulate flushCacheToBlock before having loaded everything.
+	 * This could be fixed by reimplementing performToken, or simply use it at some computational cost when building the update.
+	 */
 	Scheduler::partialSwapCodeGeneration(firstNode, secNode, [&](const BlockID & block, bool, VirtualMemory& memoryLayout, SchedulerData& commands)
 	{
 		commands.insertCommand({ERASE, block});
 
-		//FIXME: make swap of nodes possible
 		if(block == secNode.block)
 			memoryLayout.writeTaggedToBlock(block, secNode.blockFinalLayout, commands);
 		else
@@ -236,20 +240,15 @@ void Scheduler::networkSwapCodeGeneration(const NetworkNode & firstNode, const N
 		//We erase the page we're about to write
 		commands.insertCommand({ERASE, block});
 
+		const NetworkNode & curNode = block == firstNode.block ? firstNode : secNode;
 		const bool firstWrite = block == (didReverse ? firstNode.block : secNode.block);
 
 		if(firstWrite)
 		{
-			//Blocks may be swapped internally
-			if(block == secNode.block)
-				memoryLayout.writeTaggedToBlock(secNode.block, secNode.compileLayout(), commands, !secNode.isFinal);
-			else
-				memoryLayout.writeTaggedToBlock(firstNode.block, firstNode.compileLayout(), commands, !firstNode.isFinal);
+			memoryLayout.writeTaggedToBlock(curNode.block, curNode.compileLayout(), commands, !curNode.isFinal);
 		}
 		else
 		{
-			const NetworkNode & curNode = didReverse ? secNode : firstNode;
-
 			if(curNode.isFinal)
 			{
 				memoryLayout.writeTaggedToBlock(curNode.block, curNode.compileLayout(), commands, false);
