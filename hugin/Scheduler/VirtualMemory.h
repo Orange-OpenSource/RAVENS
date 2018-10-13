@@ -479,6 +479,27 @@ struct VirtualMemory
 		commitCachedWrite(commands);
 #endif
 	}
+	
+	void flushCacheToBlock(const BlockID block, bool shouldCacheWrite, SchedulerData &commands)
+	{
+		DetailedBlock writes(block);
+		Address outputAddress(block, 0);
+		for(const auto & segment : cacheLayout.segments)
+		{
+			if(segment.tagged)
+			{
+				writes.insertNewSegment(DetailedBlockMetadata(segment.source, outputAddress, segment.length, true));
+				outputAddress += segment.length;
+			}
+		}
+		
+		assert(outputAddress.value - block.value <= BLOCK_SIZE);
+
+		if(shouldCacheWrite)
+			cacheWrite(block, writes, true, commands);
+		else
+			writeTaggedToBlock(block, writes, commands);
+	}
 
 	void commitCachedWrite(SchedulerData &commands)
 	{

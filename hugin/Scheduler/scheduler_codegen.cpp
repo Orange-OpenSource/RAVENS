@@ -87,18 +87,9 @@ void Scheduler::halfSwapCodeGeneration(NetworkNode & firstNode, NetworkNode & se
 
 		//FIXME: make swap of nodes possible
 		if(block == secNode.block)
-		{
 			memoryLayout.writeTaggedToBlock(block, secNode.blockFinalLayout, commands);
-		}
 		else
-		{
-			//This is tricky, we need to look in the cache to get all the virtual addresses currently loaded.
-			//	Then, we build a DetailedBlock and use it to write the block
-
-			DetailedBlock writeCommands(block);
-			buildWriteCommandToFlushCacheFromNodes({firstNode, secNode}, memoryLayout, block, writeCommands);
-			memoryLayout.cacheWrite(block, writeCommands, true, commands);
-		}
+			memoryLayout.flushCacheToBlock(block, true, commands);
 
 	}, memoryLayout, commands, false);
 }
