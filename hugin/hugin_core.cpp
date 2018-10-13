@@ -27,9 +27,9 @@ using namespace std;
 void printCryptoHelp();
 bool processCrypto(int argc, char const *argv[]);
 
-void performStaticTests();
+bool performStaticTests();
 bool runDynamicTestWithFiles(const char * original, const char * newFile);
-void testCrypto();
+bool testCrypto();
 
 int main(int argc, char *argv[])
 {
@@ -61,14 +61,14 @@ int main(int argc, char *argv[])
 		else if(!strcmp(argv[1], "test"))
 		{
 			cout << "Validating the code generation..." << endl << "	";
-			performStaticTests();
-			runDynamicTestWithFiles("/bin/ls", "/bin/cat");
-			runDynamicTestWithFiles("test1_v1.bin", "test1_v2.bin");
-			runDynamicTestWithFiles("test2_v1.bin", "test2_v2.bin");
+			bool output = performStaticTests();
+			output &= runDynamicTestWithFiles("/bin/ls", "/bin/cat");
+			output &= runDynamicTestWithFiles("test1_v1.bin", "test1_v2.bin");
+			output &= runDynamicTestWithFiles("test2_v1.bin", "test2_v2.bin");
 
 			cout << endl << "Validation cryptographic primitives" << endl;
-			testCrypto();
-			return 0;
+			output &= testCrypto();
+			return !output;
 		}
 	}
 

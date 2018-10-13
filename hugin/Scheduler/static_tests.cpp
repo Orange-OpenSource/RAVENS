@@ -779,7 +779,7 @@ bool forthPassTestWithCompetitiveReadOnReusedSpace()
 	return validateStaticResults(output, expected, input);
 }
 
-void performStaticTests()
+bool performStaticTests()
 {
 	bool output = true;
 
@@ -793,12 +793,12 @@ void performStaticTests()
 	output &= forthPassTestWithHarderCompetitiveRead();
 	output &= forthPassTestWithCompetitiveReadOnReusedSpace();
 
-	if(output)
-	{
 #ifndef VERBOSE_STATIC_TESTS
+	if(output)
 		cout << "Static code generation tests successful" << endl;
 #endif
-	}
+	
+	return output;
 }
 
 #if 0

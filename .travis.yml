@@ -32,4 +32,5 @@ before_install:
 script:
   - cmake .
   - make -j2 Hugin
-  - ./hugin/Hugin test
+  - cd test_files
+  - ../hugin/Hugin test
