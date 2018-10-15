@@ -332,6 +332,10 @@ void VirtualMemory::loadTaggedToTMP(const DetailedBlock & dataToLoad, SchedulerD
 		}
 	}
 
+	//Make the cache more readable in the debugger
+	if(lengthAlreadyInCache + lengthToFitInCache > BLOCK_SIZE)
+		cacheLayout.trimUntagged();
+
 	//If this assert fail, we're trying to load too much data in the cache
 	assert(lengthAlreadyInCache + lengthToFitInCache <= BLOCK_SIZE);
 #endif
