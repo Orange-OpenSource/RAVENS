@@ -15,13 +15,12 @@
 #include <unordered_map>
 #include "scheduler.h"
 
-vector<BlockID> NetworkNode::tookOverNode(const NetworkNode & pulledNode, bool bypassBlockIDDrop)
+void NetworkNode::tookOverNode(const NetworkNode & pulledNode, bool bypassBlockIDDrop)
 {
 	const vector<NetworkToken> & pulledTokens = pulledNode.tokens;
 	auto pulledIter = pulledTokens.cbegin();
 
 	long remove = LONG_MAX, lengthWon = LONG_MAX;
-	vector<BlockID> needToLowerRefCount;	//We need to lower the refcount as we already had a link with this node when siphonning the pulledNode
 
 	tokens.reserve(tokens.size() + pulledTokens.size() - 1);
 
@@ -91,16 +90,8 @@ vector<BlockID> NetworkNode::tookOverNode(const NetworkNode & pulledNode, bool b
 			
 			if(pulledIter->destinationBlockID != block)
 				sumOut += pulledIter->length;
-
-			//Insert in a sorted array the blocks we need to lower the source count of
-			if(token->destinationBlockID != block || bypassBlockIDDrop)
-			{
-				needToLowerRefCount.insert(upper_bound(needToLowerRefCount.begin(), needToLowerRefCount.end(), token->destinationBlockID), token->destinationBlockID);
-			}
-			else
-			{
+			else if(!bypassBlockIDDrop)
 				lengthWon = pulledIter - pulledTokens.cbegin();
-			}
 
 			pulledIter += 1;
 		}
@@ -164,11 +155,7 @@ vector<BlockID> NetworkNode::tookOverNode(const NetworkNode & pulledNode, bool b
 			newToken.sourceBlockID = block;
 			tokens.insert(upper_bound(tokens.begin(), tokens.end(), newToken), newToken);
 		}
-
-		nbSourcesIn -= 1;
 	}
-
-	return needToLowerRefCount;
 }
 
 bool NetworkNode::dispatchInNodes(NetworkNode & node1, NetworkNode & node2)
@@ -535,56 +522,6 @@ void determineBlockDataLocation(const NetworkNode & source, const NetworkNode & 
 	}
 }
 
-void generateChanges(const unordered_map<BlockID, DataSource> & oldLocation, const unordered_map<BlockID, DataSource> & newLocation, vector<pair<BlockID, bool>> & changesForSrc, vector<pair<BlockID, bool>> & changesForDest)
-{
-	for(const auto & final : newLocation)
-	{
-		const BlockID & block = final.first;
-
-		auto origin = oldLocation.find(block);
-
-		//Data doesn't exist (wtf!?) or no change
-		if(origin == oldLocation.cend() || origin->second == final.second)
-			continue;
-
-		switch (final.second)
-		{
-			case COMMON_ORIGIN:
-			{
-				if(origin->second == SOURCE_ORIGIN)
-					changesForDest.emplace_back(block, true);
-				else
-					changesForSrc.emplace_back(block, true);
-				break;
-			}
-
-			case SOURCE_ORIGIN:
-			{
-				changesForDest.emplace_back(block, false);
-
-				//Is a win for source
-				if(origin->second != COMMON_ORIGIN)
-					changesForSrc.emplace_back(block, true);
-				break;
-			}
-
-			case DESTINATION_ORIGIN:
-			{
-				changesForSrc.emplace_back(block, false);
-
-				//Is a win for final
-				if(origin->second != COMMON_ORIGIN)
-					changesForDest.emplace_back(block, true);
-
-				break;
-			}
-		}
-	}
-
-	sort(changesForSrc.begin(), changesForSrc.end(), [](const pair<BlockID, bool> & a, const pair<BlockID, bool> & b) { return a < b; });
-	sort(changesForDest.begin(), changesForDest.end(), [](const pair<BlockID, bool> & a, const pair<BlockID, bool> & b) { return a < b; });
-}
-
 void Network::performToken(NetworkNode & source, NetworkNode & destination, SchedulerData & schedulerData)
 {
 	NetworkNode fakeCommonNode = source;
@@ -755,14 +692,6 @@ void Network::performToken(NetworkNode & source, NetworkNode & destination, Sche
 	//Update the network
 	source.tokens = newSource.tokens;			source.refreshOutgoingData();
 	destination.tokens = newDest.tokens;		destination.refreshOutgoingData();
-
-	//We then allocate the buffer to receive this data
-	vector<pair<BlockID, bool>> changesForSrc, changesForDest;
-	changesForSrc.reserve(newSource.tokens.size());
-	changesForDest.reserve(newDest.tokens.size());
-
-	generateChanges(dataOrigin, dataFinal, changesForSrc, changesForDest);
-	nodesPartiallySwapped(changesForSrc, changesForDest);
 }
 
 bool netNeedHalfSwap(const NetworkNode & source, const NetworkNode & destination)
@@ -833,7 +762,7 @@ bool Network::performBestSwap(SchedulerData & schedulerData)
 		{
 			//The source will need to provide data to more blocks, we simply clear the destination with a hswap
 			Scheduler::halfSwapCodeGeneration(source, destination, memoryLayout, schedulerData);
-			nodeSiphonned(source.block, source.tookOverNode(destination));
+			source.tookOverNode(destination);
 			pulledEverythingForNode(destination, destinationSources);
 			destination.isFinal = true;
 		}
@@ -930,7 +859,6 @@ void Network::sourcesForFinal(const NetworkNode & node, vector<BlockID> & source
 void Network::pulledEverythingForNode(NetworkNode & node, const vector<BlockID> & nodeSources)
 {
 	node.isFinal = true;
-	node.nbSourcesIn = 0;
 
 	if(nodeSources.empty())
 		return;
@@ -1149,81 +1077,6 @@ void Network::pulledEverythingForNode(NetworkNode & node, const vector<BlockID> 
 	}
 }
 
-void Network::nodeSiphonned(const BlockID & destination, const vector<BlockID> & blocksWithLessSources)
-{
-	if(blocksWithLessSources.empty())
-		return;
-
-	auto startIter = blocksWithLessSources.cbegin();
-
-	for(auto & networkNode : nodes)
-	{
-		if(networkNode.block == *startIter)
-		{
-			//Due to overlap, some networkToken may be deleted and are thus not explicitly accounted for
-			// We won't decrement nbSourcesOut if we can't find the token
-			for(const auto & token : networkNode.tokens)
-			{
-				if(token.destinationBlockID == destination)
-				{
-					assert(networkNode.nbSourcesOut != 0);
-					networkNode.nbSourcesOut -= 1;
-					break;
-				}
-			}
-
-			if(++startIter == blocksWithLessSources.cend())
-				break;
-		}
-	}
-}
-
-//bool = true mean a win, false is a loss
-void Network::nodesPartiallySwapped(const vector<pair<BlockID, bool>> & changesForA, const vector<pair<BlockID, bool>> & changesForB)
-{
-	if(changesForA.empty() && changesForB.empty())
-		return;
-
-	auto aChangesIter = changesForA.cbegin();
-	auto bChangesIter = changesForB.cbegin();
-
-	for(auto & networkNode : nodes)
-	{
-		if(networkNode.isFinal)
-			continue;
-
-		bool bothAtEnd = true, aMatch = false, bMatch = false;
-
-		if(aChangesIter != changesForA.cend())
-		{
-			aMatch = networkNode.block == aChangesIter->first;
-			bothAtEnd = false;
-		}
-
-		if(bChangesIter != changesForB.cend())
-		{
-			bMatch = networkNode.block == bChangesIter->first;
-			bothAtEnd = false;
-		}
-
-		if(bothAtEnd)
-			break;
-
-		//Both nodes reference the current one, this can only mean an exchange (overwise, one would shrink but not win/loose)
-		if(aMatch && bMatch)
-		{
-			aChangesIter += 1;
-			bChangesIter += 1;
-		}
-
-		else if(aMatch)
-			networkNode.nbSourcesIn += aChangesIter++->second ? 1 : -1;
-
-		else if(bMatch)
-			networkNode.nbSourcesIn += bChangesIter++->second ? 1 : -1;
-	}
-}
-
 void Network::performFinalFlush(SchedulerData & schedulerData)
 {
 	/*
@@ -1240,7 +1093,6 @@ void Network::performFinalFlush(SchedulerData & schedulerData)
 #endif
 			node.isFinal = true;
 			Scheduler::pullDataToNode(node, memoryLayout, schedulerData);
-			node.nbSourcesIn = 0;
 		}
 	}
 }
