@@ -188,7 +188,7 @@ struct NetworkNode
 	{
 		DetailedBlock layout;
 
-		size_t output = 0;
+		size_t output = isFinal ? lengthFinalLayout : 0;
 
 		for(const auto & token : tokens)
 		{
@@ -197,7 +197,7 @@ struct NetworkNode
 			//We have to add the data manually
 			if(isFinal && token.destinationBlockID == block)
 			{
-				output += lengthFinalLayout;
+				//We already incremented output
 				for(const auto & item : blockFinalLayout.segments)
 				{
 					if(item.tagged)
@@ -296,25 +296,26 @@ struct NetworkNode
 				{
 					if(source == block)
 					{
-						bool tokenAlreadyThere = false;
-						for(const Token & existingToken : selfToken.get().sourceToken)
-						{
-							if(existingToken.finalAddress == source)
-							{
-								assert(length <= existingToken.length);
-								tokenAlreadyThere = true;
-								break;
-							}
-						}
-
-						//Insert the token if the data isn't already there
-						if(!tokenAlreadyThere)
-							selfToken.get().sourceToken.emplace_back(Token(token.destination + tokenOffset, length, token.source + tokenOffset));
+						//Insert the token if the data may need backup. This could cause duplicates with data already inserted in the token but removeInternalOverlap will fix that for us
+						selfToken.get().sourceToken.emplace_back(Token(token.destination + tokenOffset, length, token.source + tokenOffset));
 					}
 					tokenOffset += length;
 				});
 			}
 		}
+		
+		selfToken.get().removeInternalOverlap();
+		
+#ifdef VERY_AGGRESSIVE_ASSERT
+		{
+			//We may have inserted some duplicates but nothing should be left after removeInternalOverlap
+			size_t tokenLength = 0;
+			for(const auto & token : selfToken.get().sourceToken)
+				tokenLength += token.length;
+
+			assert(tokenLength <= lengthFinalLayout);
+		}
+#endif
 
 		//If a new token, we insert it into the array
 		if(!foundCore)

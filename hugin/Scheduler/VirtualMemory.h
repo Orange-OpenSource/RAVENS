@@ -315,13 +315,6 @@ struct VirtualMemory
 		flushCache();
 	}
 
-	void redirect(const DetailedBlock & blockToRedirect, const BlockID & destinationBlock)
-	{
-		for (const auto &segment : blockToRedirect.segments)
-			translationTable.staggeredRedirect(segment.source, segment.length, Address(destinationBlock, segment.destination.getOffset()));
-		performRedirect();
-	}
-
 	void didComplexLoadInCache(const CacheMemory &newTmpLayout)
 	{
 		hasCache = true;
