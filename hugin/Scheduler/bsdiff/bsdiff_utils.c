@@ -272,10 +272,7 @@ uint8_t * readFile(const char * file, size_t * fileSize)
 {
 	int fd = open(file, O_RDONLY, 0);
 	if(fd < 0)
-	{
-		warn("Couldn't open file %s", file);
 		return NULL;
-	}
 
 	off_t length = lseek(fd, 0, SEEK_END);
 	if(length == -1)

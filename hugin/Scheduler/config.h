@@ -46,11 +46,11 @@
  * Various other options
  */
 
-#define WANT_DEBUG
+// #define WANT_DEBUG
 #ifdef WANT_DEBUG
 	#define VERBOSE_STATIC_TESTS
 	#define PRINT_REAL_INSTRUCTIONS
-	#define PRINT_BSDIFF
+//	#define PRINT_BSDIFF
 	#define PRINT_SELECTED_LINKS
 //	#define DISABLE_CHAINED_COPY
 #endif
