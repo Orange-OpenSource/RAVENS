@@ -1,4 +1,4 @@
-# Hugin
+# Hugin [![Build Status](https://travis-ci.org/Orange-OpenSource/RAVENS.svg?branch=master)](https://travis-ci.org/Orange-OpenSource/RAVENS)
 
 Hugin is a command line util able to generate small delta software updates, easy to install in-place on constrained devices. Hugin can then be used to authenticate the update package, can distribute it to devices. Munin offer a reference implementation of the code necessary on the device to install the update package, in place, in a resilient manner.
 
