@@ -275,11 +275,6 @@ struct VirtualMemory
 
 	VirtualMemory(const vector<Block> &blocks, const vector<size_t> &indexes) : translationTable(blocks, indexes), cacheLayout(), hasCachedWrite(false), cachedWriteBlock(CACHE_BUF), cachedWriteRequest() {}
 
-	void flushCache()
-	{
-		cacheLayout.flush();
-	}
-
 	void translateSegment(Address from, size_t length, vector<DetailedBlockMetadata> & output) const
 	{
 		output.reserve(4);
@@ -479,6 +474,27 @@ struct VirtualMemory
 		commitCachedWrite(commands);
 #endif
 	}
+	
+	void flushCacheToBlock(const BlockID block, bool shouldCacheWrite, SchedulerData &commands)
+	{
+		DetailedBlock writes(block);
+		Address outputAddress(block, 0);
+		for(const auto & segment : cacheLayout.segments)
+		{
+			if(segment.tagged)
+			{
+				writes.insertNewSegment(DetailedBlockMetadata(segment.source, outputAddress, segment.length, true));
+				outputAddress += segment.length;
+			}
+		}
+		
+		assert(outputAddress.value - block.value <= BLOCK_SIZE);
+
+		if(shouldCacheWrite)
+			cacheWrite(block, writes, true, commands);
+		else
+			writeTaggedToBlock(block, writes, commands);
+	}
 
 	void commitCachedWrite(SchedulerData &commands)
 	{
@@ -508,7 +524,7 @@ struct VirtualMemory
 
 private:
 	void _sortBySortedAddress(const DetailedBlock & dataToLoad, vector<DetailedBlockMetadata> & output);
-	void _retagReusedToken(vector<DetailedBlockMetadata> & sortedTokenWithTranslation);
+	void _retagReusedToken(const DetailedBlock & dataToLoad);
 	void _loadTaggedToTMP(const DetailedBlock & dataToLoad, SchedulerData & commands);
 };
 

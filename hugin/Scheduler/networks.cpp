@@ -15,13 +15,12 @@
 #include <unordered_map>
 #include "scheduler.h"
 
-vector<BlockID> NetworkNode::tookOverNode(const NetworkNode & pulledNode, bool bypassBlockIDDrop)
+void NetworkNode::tookOverNode(const NetworkNode & pulledNode, bool bypassBlockIDDrop)
 {
 	const vector<NetworkToken> & pulledTokens = pulledNode.tokens;
 	auto pulledIter = pulledTokens.cbegin();
 
 	long remove = LONG_MAX, lengthWon = LONG_MAX;
-	vector<BlockID> needToLowerRefCount;	//We need to lower the refcount as we already had a link with this node when siphonning the pulledNode
 
 	tokens.reserve(tokens.size() + pulledTokens.size() - 1);
 
@@ -88,16 +87,11 @@ vector<BlockID> NetworkNode::tookOverNode(const NetworkNode & pulledNode, bool b
 			//An existing chunk was siphoned
 			token->length += pulledIter->length;
 			token->sourceToken.insert(token->sourceToken.end(), pulledIter->sourceToken.begin(), pulledIter->sourceToken.end());
-
-			//Insert in a sorted array the blocks we need to lower the source count of
-			if(token->destinationBlockID != block || bypassBlockIDDrop)
-			{
-				needToLowerRefCount.insert(upper_bound(needToLowerRefCount.begin(), needToLowerRefCount.end(), token->destinationBlockID), token->destinationBlockID);
-			}
-			else
-			{
+			
+			if(pulledIter->destinationBlockID != block)
+				sumOut += pulledIter->length;
+			else if(!bypassBlockIDDrop)
 				lengthWon = pulledIter - pulledTokens.cbegin();
-			}
 
 			pulledIter += 1;
 		}
@@ -161,11 +155,7 @@ vector<BlockID> NetworkNode::tookOverNode(const NetworkNode & pulledNode, bool b
 			newToken.sourceBlockID = block;
 			tokens.insert(upper_bound(tokens.begin(), tokens.end(), newToken), newToken);
 		}
-
-		nbSourcesIn -= 1;
 	}
-
-	return needToLowerRefCount;
 }
 
 bool NetworkNode::dispatchInNodes(NetworkNode & node1, NetworkNode & node2)
@@ -532,56 +522,6 @@ void determineBlockDataLocation(const NetworkNode & source, const NetworkNode & 
 	}
 }
 
-void generateChanges(const unordered_map<BlockID, DataSource> & oldLocation, const unordered_map<BlockID, DataSource> & newLocation, vector<pair<BlockID, bool>> & changesForSrc, vector<pair<BlockID, bool>> & changesForDest)
-{
-	for(const auto & final : newLocation)
-	{
-		const BlockID & block = final.first;
-
-		auto origin = oldLocation.find(block);
-
-		//Data doesn't exist (wtf!?) or no change
-		if(origin == oldLocation.cend() || origin->second == final.second)
-			continue;
-
-		switch (final.second)
-		{
-			case COMMON_ORIGIN:
-			{
-				if(origin->second == SOURCE_ORIGIN)
-					changesForDest.emplace_back(block, true);
-				else
-					changesForSrc.emplace_back(block, true);
-				break;
-			}
-
-			case SOURCE_ORIGIN:
-			{
-				changesForDest.emplace_back(block, false);
-
-				//Is a win for source
-				if(origin->second != COMMON_ORIGIN)
-					changesForSrc.emplace_back(block, true);
-				break;
-			}
-
-			case DESTINATION_ORIGIN:
-			{
-				changesForSrc.emplace_back(block, false);
-
-				//Is a win for final
-				if(origin->second != COMMON_ORIGIN)
-					changesForDest.emplace_back(block, true);
-
-				break;
-			}
-		}
-	}
-
-	sort(changesForSrc.begin(), changesForSrc.end(), [](const pair<BlockID, bool> & a, const pair<BlockID, bool> & b) { return a < b; });
-	sort(changesForDest.begin(), changesForDest.end(), [](const pair<BlockID, bool> & a, const pair<BlockID, bool> & b) { return a < b; });
-}
-
 void Network::performToken(NetworkNode & source, NetworkNode & destination, SchedulerData & schedulerData)
 {
 	NetworkNode fakeCommonNode = source;
@@ -596,7 +536,7 @@ void Network::performToken(NetworkNode & source, NetworkNode & destination, Sche
 	if(sourceCoreIter != tokenPool.end() && sourceCoreIter->destinationBlockID == source.block)
 	{
 		oldSource = *sourceCoreIter;
-        oldSource.removeInternalOverlap();
+		oldSource.removeInternalOverlap();
 		tokenPool.erase(sourceCoreIter);
 		hadSource = true;
 	}
@@ -685,6 +625,9 @@ void Network::performToken(NetworkNode & source, NetworkNode & destination, Sche
 	}
 
 	//If one of the node have turned final, we remove incomming data from any other potential token
+	//We also collect the data for pulledEverythingForNode
+	vector<BlockID> sourceSources, destinationSources;
+
 	if(newSource.isFinal || newDest.isFinal)
 	{
 		vector<NetworkToken> finalToken;
@@ -704,6 +647,7 @@ void Network::performToken(NetworkNode & source, NetworkNode & destination, Sche
 			}
 
 			finalToken.emplace_back(fakeSourceToken);
+			sourcesForFinal(newSource, sourceSources);
 		}
 
 		if(newDest.isFinal)
@@ -721,6 +665,7 @@ void Network::performToken(NetworkNode & source, NetworkNode & destination, Sche
 			}
 
 			finalToken.emplace_back(fakeDestToken);
+			sourcesForFinal(newDest, destinationSources);
 		}
 
 		fakeCommonNode.removeOverlapWithToken(finalToken);
@@ -741,20 +686,12 @@ void Network::performToken(NetworkNode & source, NetworkNode & destination, Sche
 	determineBlockDataLocation(newSource, newDest, dataFinal);
 
 	//Before updating the tokens, we signal potential final moves
-	if(newSource.isFinal)	pulledEverythingForNode(source);
-	if(newDest.isFinal)		pulledEverythingForNode(destination);
+	if(newSource.isFinal)	pulledEverythingForNode(source, sourceSources);
+	if(newDest.isFinal)		pulledEverythingForNode(destination, destinationSources);
 
 	//Update the network
 	source.tokens = newSource.tokens;			source.refreshOutgoingData();
 	destination.tokens = newDest.tokens;		destination.refreshOutgoingData();
-
-	//We then allocate the buffer to receive this data
-	vector<pair<BlockID, bool>> changesForSrc, changesForDest;
-	changesForSrc.reserve(newSource.tokens.size());
-	changesForDest.reserve(newDest.tokens.size());
-
-	generateChanges(dataOrigin, dataFinal, changesForSrc, changesForDest);
-	nodesPartiallySwapped(changesForSrc, changesForDest);
 }
 
 bool netNeedHalfSwap(const NetworkNode & source, const NetworkNode & destination)
@@ -817,25 +754,32 @@ bool Network::performBestSwap(SchedulerData & schedulerData)
 	bool ignoreRefresh = false;
 	if(bestToken.length >= destination.sumOut)
 	{
+		vector<BlockID> destinationSources;
+		sourcesForFinal(destination, destinationSources);
+
 		//We can perform a single swap (or hswap) that will let destination become its final form and the source node get the extra data
 		if(netNeedHalfSwap(source, destination))
 		{
 			//The source will need to provide data to more blocks, we simply clear the destination with a hswap
 			Scheduler::halfSwapCodeGeneration(source, destination, memoryLayout, schedulerData);
-			nodeSiphonned(source.block, source.tookOverNode(destination));
-			pulledEverythingForNode(destination);
+			source.tookOverNode(destination);
+			pulledEverythingForNode(destination, destinationSources);
 			destination.isFinal = true;
 		}
 		else
 		{
 			bool sourceWasFinal = source.isFinal;
+			vector<BlockID> sourceSources;
+
+			if(!sourceWasFinal)
+				sourcesForFinal(source, sourceSources);
 
 			//Source also can reach its final form!
 			Scheduler::reorderingSwapCodeGeneration(source, destination, memoryLayout, schedulerData);
-			pulledEverythingForNode(destination);
+			pulledEverythingForNode(destination, destinationSources);
 
 			if(!sourceWasFinal)
-				pulledEverythingForNode(source);
+				pulledEverythingForNode(source, sourceSources);
 
 			source.refreshOutgoingData();
 			ignoreRefresh = true;
@@ -885,127 +829,251 @@ bool Network::performBestSwap(SchedulerData & schedulerData)
 	return true;
 }
 
-void Network::pulledEverythingForNode(NetworkNode & node)
+void Network::sourcesForFinal(const NetworkNode & node, vector<BlockID> & sources)
 {
-	if(!node.tokens.empty() || node.nbSourcesIn)
+	unordered_set<BlockID> sourcesCollector;
+
+	sourcesCollector.reserve(node.blockFinalLayout.segments.size());
+	for(const auto & token : node.blockFinalLayout.segments)
 	{
-		//Token is sorted
-		for(auto & networkNode : nodes)
+		memoryLayout.iterateTranslatedSegments(token.source, token.length, [&sourcesCollector](const Address & translation, const size_t &length)
 		{
-			if(networkNode.isFinal)
-				continue;
-
-			size_t tokenPos = 0;
-			//Clear all token toward us
-			for(auto & token : networkNode.tokens)
-			{
-				//FIXME: we don't look for token we siphoned when turning final which were not explicitely aimed at us (because the data is duplicated)
-				//	The cheapest fix would likely to cache the blocks with incomming data when turning final, but before the VM is updated
-				if(!token.cleared && token.destinationBlockID == node.block)
-				{
-					//We may have a token due to an internal transfer
-					if(!networkNode.isFinal && networkNode.block != node.block)
-					{
-						assert(networkNode.nbSourcesOut != 0);
-						networkNode.sumOut -= token.length;
-						networkNode.nbSourcesOut -= 1;
-						networkNode.tokens.erase(networkNode.tokens.begin() + tokenPos);
-
-						//We may be interfering with largestToken.
-						if(tokenPos < networkNode.largestToken)
-							networkNode.largestToken -= 1;
-						else if(tokenPos == networkNode.largestToken)
-							networkNode.needRefreshLargestToken = true;
-					}
-					else
-					{
-						token.cleared = true;
-					}
-
-					break;
-				}
-
-				tokenPos += 1;
-			}
-		}
+			sourcesCollector.insert(translation.getBlock());
+			assert(translation.getOffset() + length <= BLOCK_SIZE);
+		});
 	}
 
+	if(!sourcesCollector.empty())
+	{
+		sources.reserve(sources.size() + sourcesCollector.size());
+		for(const BlockID & block : sourcesCollector)
+		{
+			if(block != node.block)
+				sources.emplace_back(block);
+		}
+
+		sort(sources.begin(), sources.end(), [](const BlockID & a, const BlockID & b) { return a.value < b.value; });
+	}
+}
+
+void Network::pulledEverythingForNode(NetworkNode & node, const vector<BlockID> & nodeSources)
+{
 	node.isFinal = true;
-	node.nbSourcesIn = 0;
-}
 
-void Network::nodeSiphonned(const BlockID & destination, const vector<BlockID> & blocksWithLessSources)
-{
-	if(blocksWithLessSources.empty())
+	if(nodeSources.empty())
 		return;
 
-	auto startIter = blocksWithLessSources.cbegin();
-
+	vector<pair<size_t, size_t>> segmentsToRemove;
+	auto nextSource = nodeSources.cbegin();
 	for(auto & networkNode : nodes)
 	{
-		if(networkNode.block == *startIter)
-		{
-			//Due to overlap, some networkToken may be deleted and are thus not explicitly accounted for
-			// We won't decrement nbSourcesOut if we can't find the token
-			for(const auto & token : networkNode.tokens)
-			{
-				if(token.destinationBlockID == destination)
-				{
-					assert(networkNode.nbSourcesOut != 0);
-					networkNode.nbSourcesOut -= 1;
-					break;
-				}
-			}
-
-			if(++startIter == blocksWithLessSources.cend())
-				break;
-		}
-	}
-}
-
-//bool = true mean a win, false is a loss
-void Network::nodesPartiallySwapped(const vector<pair<BlockID, bool>> & changesForA, const vector<pair<BlockID, bool>> & changesForB)
-{
-	if(changesForA.empty() && changesForB.empty())
-		return;
-
-	auto aChangesIter = changesForA.cbegin();
-	auto bChangesIter = changesForB.cbegin();
-
-	for(auto & networkNode : nodes)
-	{
-		if(networkNode.isFinal)
+		//We go through the nodes, waiting for one we identified as a source of data for node's final state
+		if(networkNode.block < *nextSource)
 			continue;
 
-		bool bothAtEnd = true, aMatch = false, bMatch = false;
-
-		if(aChangesIter != changesForA.cend())
+		//The node we're looking for doesn't actually exist... Oops.
+		if(networkNode.block != *nextSource)
 		{
-			aMatch = networkNode.block == aChangesIter->first;
-			bothAtEnd = false;
+			do {
+				nextSource += 1;
+			} while(networkNode.block > *nextSource);
+
+			if(networkNode.block < *nextSource)
+				continue;
 		}
 
-		if(bChangesIter != changesForB.cend())
+		if(networkNode.isFinal)
 		{
-			bMatch = networkNode.block == bChangesIter->first;
-			bothAtEnd = false;
+			nextSource += 1;
+			continue;
 		}
 
-		if(bothAtEnd)
+#ifdef VERY_AGGRESSIVE_ASSERT
+		{
+			size_t checkSumOut = 0;
+			for(const auto & token : networkNode.tokens)
+			{
+				if(!token.cleared && token.destinationBlockID != networkNode.block)
+					checkSumOut += token.length;
+				
+				else if(token.destinationBlockID == node.block)
+					checkSumOut += token.length;
+			}
+			assert(networkNode.sumOut == checkSumOut);
+		}
+#endif
+
+		//Whenever we hit it, we iterate all its NetworkToken and their sourceToken, looking for something we may have siphonned
+		for(auto tokenNode = networkNode.tokens.begin(); tokenNode != networkNode.tokens.end(); )
+		{
+			if(tokenNode->destinationBlockID == node.block)
+			{
+				//Update the context
+				assert(networkNode.nbSourcesOut != 0);
+				networkNode.sumOut -= tokenNode->length;
+				networkNode.nbSourcesOut -= 1;
+
+				//Delete the node
+				const size_t offset = tokenNode - networkNode.tokens.begin();
+				networkNode.tokens.erase(tokenNode);
+				tokenNode = networkNode.tokens.begin() + offset;
+
+				if(networkNode.largestToken > offset)
+					networkNode.largestToken -= 1;
+				else if(networkNode.largestToken == offset)
+					networkNode.needRefreshLargestToken = true;
+
+				//Skip the more complex logic
+				continue;
+			}
+			else if(tokenNode->cleared)
+			{
+				tokenNode += 1;
+				continue;
+			}
+
+			//Alright, this is the complex path. We're suspecting the token may have been partially siphoned.
+			auto & sourceToken = tokenNode->sourceToken;
+			for(auto token = sourceToken.begin(); token != sourceToken.end(); )
+			{
+				//For each sourceToken, we check if part of it no longer resolve to the node it's supposed to belong to
+				bool shouldRemoveToken = false;
+				size_t currentOffset = 0;
+				memoryLayout.iterateTranslatedSegments(token->origin, token->length, [&](const Address & translation, const size_t &length)
+				{
+					//The token translate to the block that turned final... Either it was siphonned, or the data was moved out of it and the write is cached
+					if(translation == node.block)
+					{
+						bool falseAlarm = false;
+						//If we have a cached write, we make sure the chunk was siphonned
+						if(memoryLayout.hasCachedWrite && networkNode.block == memoryLayout.cachedWriteBlock)
+						{
+							falseAlarm = true;
+							for(const auto & finalToken : node.blockFinalLayout.segments)
+							{
+								if(finalToken.tagged && finalToken.overlapWith(token->origin + currentOffset, length))
+								{
+									falseAlarm = false;
+									break;
+								}
+							}
+						}
+
+						if(!falseAlarm)
+						{
+							//The whole token has to go. Yeah!
+							if(length == token->length)
+								shouldRemoveToken = true;
+							else
+								segmentsToRemove.push_back({currentOffset, length});
+						}
+					}
+
+					//No need to deal with the counter if there is only a single token
+					if(length != token->length)
+						currentOffset += length;
+				});
+
+				size_t tokenLengthRemoved = token->length;
+
+				//We have multiple sections to remove :/
+				if(!segmentsToRemove.empty())
+				{
+					//We create a DetailedBlock with the memory range in order to reuse the logic in insertNewSegment
+					DetailedBlock chunk;
+					chunk.segments.emplace_back(DetailedBlockMetadata(Address(0), token->length, true));
+
+					//Untag parts of the segment
+					for(const auto & segment : segmentsToRemove)
+					{
+						assert(segment.first + segment.second <= token->length);
+						chunk.insertNewSegment(DetailedBlockMetadata(Address(segment.first), segment.second, false));
+					}
+					segmentsToRemove.clear();
+
+					//If any tag section remain, we add them at the end of sourceToken, then removed the original segment. This isn't optimal as the end will be processed twice, but it's simpler
+					const size_t tokenOffset = token - sourceToken.begin();
+					auto tokenCopy = *token;
+					for(const auto & segment : chunk.segments)
+					{
+						//FIXME: Perform the insertion in place so we don't process the token twice. Ideally, would use std::move if necessary, or simply update the token if possible
+						if(segment.tagged)
+						{
+							sourceToken.emplace_back(Token(tokenCopy.finalAddress + segment.source.value, segment.length, tokenCopy.origin + segment.source.value));
+							tokenLengthRemoved -= segment.length;
+						}
+					}
+
+					//We refresh the iterator, as it may have been invalidated by emplace_back
+					token = sourceToken.begin() + tokenOffset;
+					
+					//Alright, we can now remove the original token
+					shouldRemoveToken = true;
+				}
+
+				if(shouldRemoveToken)
+				{
+					//We update the NetworkToken length and the node's sumOut
+					assert(token->length >= tokenLengthRemoved);
+
+					//Update the node context
+					networkNode.needRefreshLargestToken = true;
+					tokenNode->length -= tokenLengthRemoved;
+
+					if(tokenNode->destinationBlockID != networkNode.block)
+					{
+						assert(networkNode.sumOut >= tokenLengthRemoved);
+						networkNode.sumOut -= tokenLengthRemoved;
+					}
+
+					//Actually erase the sourceToken
+					const size_t offset = token - sourceToken.begin();
+					sourceToken.erase(token);
+					token = sourceToken.begin() + offset;
+				}
+				else
+					token += 1;
+			}
+
+			if(tokenNode->sourceToken.empty())
+			{
+				//Update the node context
+				assert(!tokenNode->cleared);
+				if(tokenNode->destinationBlockID != networkNode.block)
+				{
+					assert(networkNode.nbSourcesOut > 0);
+					networkNode.nbSourcesOut -= 1;
+				}
+
+				const size_t offset = tokenNode - networkNode.tokens.begin();
+
+				if(networkNode.largestToken > offset)
+					networkNode.largestToken -= 1;
+				else if(networkNode.largestToken == offset)
+					networkNode.needRefreshLargestToken = true;
+
+				networkNode.tokens.erase(tokenNode);
+				tokenNode = networkNode.tokens.begin() + offset;
+			}
+			else
+				tokenNode += 1;
+		}
+
+#ifdef VERY_AGGRESSIVE_ASSERT
+		{
+			size_t checkSumOut = 0;
+			for(const auto & token : networkNode.tokens)
+			{
+				if(!token.cleared && token.destinationBlockID != networkNode.block)
+					checkSumOut += token.length;
+			}
+			assert(networkNode.sumOut == checkSumOut);
+		}
+#endif
+
+		nextSource += 1;
+		if(nextSource == nodeSources.cend())
 			break;
-
-		//Both nodes reference the current one, this can only mean an exchange (overwise, one would shrink but not win/loose)
-		if(aMatch && bMatch)
-		{
-			aChangesIter += 1;
-			bChangesIter += 1;
-		}
-
-		else if(aMatch)
-			networkNode.nbSourcesIn += aChangesIter++->second ? 1 : -1;
-
-		else if(bMatch)
-			networkNode.nbSourcesIn += bChangesIter++->second ? 1 : -1;
 	}
 }
 
@@ -1025,7 +1093,6 @@ void Network::performFinalFlush(SchedulerData & schedulerData)
 #endif
 			node.isFinal = true;
 			Scheduler::pullDataToNode(node, memoryLayout, schedulerData);
-			node.nbSourcesIn = 0;
 		}
 	}
 }

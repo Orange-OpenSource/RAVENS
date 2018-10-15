@@ -61,77 +61,6 @@ void extractSubSectionToLoad(const DetailedBlockMetadata & toExtract, const Cach
 	}
 }
 
-//FIXME: this is unecessary and should be dramatically simplified
-void buildWriteCommandToFlushCacheFromNodes(const vector<NetworkNode> & nodes, const VirtualMemory & virtualMemory, const BlockID & destination, DetailedBlock & commands)
-{
-	for(const auto & node : nodes)
-	{
-		for(const auto & token : node.tokens)
-		{
-			if(token.cleared)
-				continue;
-
-			for(const auto & segment : token.sourceToken)
-			{
-				//Get the section NOT in the cache
-				vector<DetailedBlockMetadata> sectionNotPresent;
-				extractSubSectionToLoad(segment, virtualMemory.cacheLayout, sectionNotPresent);
-
-				//If everything is, that's simpler
-				if(sectionNotPresent.empty())
-				{
-					commands.insertNewSegment(segment);
-					continue;
-				}
-
-				//If nothing is in the cache, we can skip
-				if(sectionNotPresent.size() == 1 && sectionNotPresent.front().length == segment.length)
-				{
-					continue;
-				}
-
-				//We have fragments not in the cache, that sucks. First, let's sort the pieces recovered by source
-				sort(sectionNotPresent.begin(), sectionNotPresent.end(), [](const DetailedBlockMetadata & a, const DetailedBlockMetadata & b)
-				{
-					return a.source.value < b.source.value;
-				});
-
-				//We then get a "head" starting at the beginning of the segment
-				Address baseSegment = segment.origin;
-				size_t length = segment.length;
-
-				for(const auto & section : sectionNotPresent)
-				{
-					//Do we have a section in the cache before this segment?
-					if(baseSegment.value < section.source.value)
-					{
-						const size_t deltaLength = section.source.value - baseSegment.value;
-						commands.insertNewSegment(DetailedBlockMetadata(baseSegment, deltaLength, true));
-					}
-
-					const size_t jumpForward = section.source.value + section.length;
-					const size_t deltaJump = jumpForward - baseSegment.value;
-					assert(deltaJump <= length);
-
-					baseSegment.value = jumpForward;
-					length -= deltaJump;
-				}
-
-				if(length != 0)
-					commands.insertNewSegment(DetailedBlockMetadata(baseSegment, length, true));
-			}
-		}
-	}
-
-	//Replace the destination by a sequence of addresses
-	Address outputAddress(destination, 0);
-	for(auto segment : commands.segments)
-	{
-		segment.destination = outputAddress;
-		outputAddress += segment.length;
-	}
-}
-
 void VirtualMemory::_sortBySortedAddress(const DetailedBlock & dataToLoad, vector<DetailedBlockMetadata> & output)
 {
 	if(dataToLoad.segments.size() == 1)
@@ -159,14 +88,84 @@ void VirtualMemory::_sortBySortedAddress(const DetailedBlock & dataToLoad, vecto
 	sort(output.begin(), output.end(), [](const DetailedBlockMetadata & a, const DetailedBlockMetadata & b) { return a.destination < b.destination; });
 }
 
-void VirtualMemory::_retagReusedToken(vector<DetailedBlockMetadata> & sortedTokenWithTranslation)
+void VirtualMemory::_retagReusedToken(const DetailedBlock & dataToLoad)
 {
-	//It may be interesting to retag token already in the cache so that we don't generate unecessary COPYs
-#warning "To Implement"
+	for(auto curTmp = cacheLayout.segments.begin(); curTmp != cacheLayout.segments.end(); ++curTmp)
+	{
+		//We don't care about tagged segments
+		if(curTmp->tagged)
+			continue;
+
+		for(const auto & segmentToLoad : dataToLoad.segments)
+		{
+			if(curTmp->overlapWith(segmentToLoad.source, segmentToLoad.length))
+			{
+				//Partial overlap?
+				if(curTmp->source < segmentToLoad.source || curTmp->source + curTmp->length > segmentToLoad.source + segmentToLoad.length)
+				{
+					//We're starting before, so a section at the beginning of the segment shouldn't be retagged
+					if(curTmp->source < segmentToLoad.source)
+					{
+						DetailedBlockMetadata newBlock = *curTmp;
+						const size_t earlyNonOverlap = segmentToLoad.source.value - newBlock.source.value;
+
+						newBlock.destination += earlyNonOverlap;
+						newBlock.source += earlyNonOverlap;
+						newBlock.length -= earlyNonOverlap;
+						newBlock.tagged = true;
+
+						if(newBlock.length != 0)
+						{
+							curTmp->length = earlyNonOverlap;
+							cacheLayout.segments.insert(curTmp + 1, newBlock);
+							curTmp += 1;
+						}
+					}
+
+					//The cache segment is finishing after, so we shouldn't tag the section after the match
+					if(curTmp->source + curTmp->length > segmentToLoad.source + segmentToLoad.length)
+					{
+						DetailedBlockMetadata newBlock = *curTmp;
+						const size_t lateNonOverlap = (curTmp->source + curTmp->length).value - (segmentToLoad.source + segmentToLoad.length).value;
+						const size_t overlappingSectionLength = newBlock.length - lateNonOverlap;
+
+						newBlock.destination += overlappingSectionLength;
+						newBlock.source += overlappingSectionLength;
+						newBlock.length = lateNonOverlap;
+
+						if(newBlock.length != 0)
+						{
+							curTmp->length -= newBlock.length;
+							curTmp->tagged = true;
+
+							cacheLayout.segments.insert(curTmp + 1, newBlock);
+							curTmp += 1;
+							break;
+						}
+					}
+				}
+				else
+				{
+					//Retag the whole segment
+					curTmp->tagged = true;
+				}
+			}
+		}
+	}
+#ifdef VERY_AGGRESSIVE_ASSERT
+	Address curPos(CACHE_BUF);
+	for(const auto & cacheSegment : cacheLayout.segments)
+	{
+		assert(cacheSegment.destination == curPos);
+		curPos += cacheSegment.length;
+	}
+#endif
 }
 
 void VirtualMemory::_loadTaggedToTMP(const DetailedBlock & dataToLoad, SchedulerData & commands)
 {
+	_retagReusedToken(dataToLoad);
+
 	CacheMemory tmpLayoutCopy = cacheLayout;
 	commands.newTransaction();
 	
@@ -186,22 +185,49 @@ void VirtualMemory::_loadTaggedToTMP(const DetailedBlock & dataToLoad, Scheduler
 		{
 			//We try to find room somewhere in the cache
 			bool foundGoodMatch = false;
+			size_t sequentialUntagLength = 0, numberOfImpactedChunk = 0;
 			auto tmpSegment = tmpLayoutCopy.segments.begin();
 			while(tmpSegment != tmpLayoutCopy.segments.end())
 			{
-				if(!tmpSegment->tagged && tmpSegment->length >= segment.length)
+				if(!tmpSegment->tagged)
 				{
-					foundGoodMatch = true;
-					break;
+					sequentialUntagLength += tmpSegment->length;
+
+					if(sequentialUntagLength >= segment.length)
+					{
+						//We found a match. Has it required more than one chunk? If so, we should merge them
+						if(tmpSegment->length != sequentialUntagLength)
+						{
+							//Jump back to the first chunk, then extend it
+							tmpSegment -= numberOfImpactedChunk;
+							tmpSegment->length = sequentialUntagLength;
+							tmpSegment->source = tmpSegment->destination;
+
+							//And remove the extraneous chunks
+							while(numberOfImpactedChunk--)
+								tmpLayoutCopy.segments.erase(tmpSegment + 1);
+						}
+
+						foundGoodMatch = true;
+						break;
+					}
+
+					numberOfImpactedChunk += 1;
 				}
 				else
-					tmpSegment += 1;
+				{
+					sequentialUntagLength = 0;
+					numberOfImpactedChunk = 0;
+				}
+
+				tmpSegment += 1;
 			}
 
 			//If couldn't find anything, we defragment
 			if(!foundGoodMatch)
 			{
 				//Restart the iterator and make room
+				tmpLayoutCopy.trimUntagged();
 				tmpSegment = tmpLayoutCopy.segments.begin();
 
 				//Make the necessary room in CACHE_BUF
@@ -266,14 +292,20 @@ void VirtualMemory::_loadTaggedToTMP(const DetailedBlock & dataToLoad, Scheduler
 		}
 	}
 
+#ifdef VERY_AGGRESSIVE_ASSERT
+	Address curPos(CACHE_BUF);
+	for(const auto & cacheSegment : tmpLayoutCopy.segments)
+	{
+		assert(cacheSegment.destination == curPos);
+		curPos += cacheSegment.length;
+	}
+#endif
 	commands.finishTransaction();
 	cacheLayout = tmpLayoutCopy;
 }
 
 void VirtualMemory::loadTaggedToTMP(const DetailedBlock & dataToLoad, SchedulerData & commands)
 {
-	cacheLayout.trimUntagged();
-
 #ifdef VERY_AGGRESSIVE_ASSERT
 	//We check if we have enough room in the cache to load our data
 	size_t lengthAlreadyInCache = 0, lengthToFitInCache = 0;
@@ -299,6 +331,10 @@ void VirtualMemory::loadTaggedToTMP(const DetailedBlock & dataToLoad, SchedulerD
 
 		}
 	}
+
+	//Make the cache more readable in the debugger
+	if(lengthAlreadyInCache + lengthToFitInCache > BLOCK_SIZE)
+		cacheLayout.trimUntagged();
 
 	//If this assert fail, we're trying to load too much data in the cache
 	assert(lengthAlreadyInCache + lengthToFitInCache <= BLOCK_SIZE);

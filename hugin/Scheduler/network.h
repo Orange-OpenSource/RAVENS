@@ -22,7 +22,6 @@ struct NetworkNode
 	BlockID block;
 	DetailedBlock blockFinalLayout;
 	vector<NetworkToken> tokens;	//The data we currently hold
-	size_t nbSourcesIn;
 	size_t nbSourcesOut;
 	size_t sumOut;
 	size_t lengthFinalLayout;
@@ -37,7 +36,11 @@ struct NetworkNode
 	bool needRefreshLargestToken;
 
 	NetworkNode(const BlockID & curBlockID, const vector<NetworkToken> & allTokens) : block(curBlockID), blockFinalLayout(curBlockID),
-				nbSourcesIn(0), nbSourcesOut(0), sumOut(0), lengthFinalLayout(0), largestToken(0), isFinal(false), needRefreshLargestToken(false)
+				nbSourcesOut(0), sumOut(0), lengthFinalLayout(0),
+#ifdef PRINT_SELECTED_LINKS
+				touchCount(0),
+#endif
+				largestToken(0), isFinal(false), needRefreshLargestToken(false)
 	{
 		//Very expensive,
 		for(const auto & token : allTokens)
@@ -49,7 +52,11 @@ struct NetworkNode
 	}
 
 	NetworkNode(const Block & curBlock, const vector<NetworkToken> & allTokens) : block(curBlock.blockID), blockFinalLayout(curBlock.blockID),
-				nbSourcesIn(0), nbSourcesOut(0), sumOut(0), lengthFinalLayout(0), largestToken(0), isFinal(false), needRefreshLargestToken(false)
+				nbSourcesOut(0), sumOut(0), lengthFinalLayout(0),
+#ifdef PRINT_SELECTED_LINKS
+				touchCount(0),
+#endif
+				largestToken(0), isFinal(false), needRefreshLargestToken(false)
 	{
 		//We first import sourceID matches, allTokens are sorted by sourceID
 		auto startSourceID = lower_bound(allTokens.cbegin(), allTokens.cend(), block, [](const NetworkToken & a, const BlockID & b) { return a.sourceBlockID < b; });
@@ -83,11 +90,11 @@ struct NetworkNode
 #endif
 	}
 
-	vector<BlockID> tookOverNode(const NetworkNode & pulledNode, bool bypassBlockIDDrop = false);
+	void tookOverNode(const NetworkNode & pulledNode, bool bypassBlockIDDrop = false);
 
 	void refreshLargestToken(function<size_t(const NetworkToken&)> lambda)
 	{
-		if(nbSourcesOut != 0)
+		if(!isFinal && nbSourcesOut != 0)
 		{
 			size_t counter = 0;
 			largestTokenWeight = INT64_MIN;
@@ -158,7 +165,6 @@ struct NetworkNode
 		}
 		else if(token.destinationBlockID == block)
 		{
-			nbSourcesIn += 1;
 			appendFinalToken(token);
 		}
 	}
@@ -261,7 +267,6 @@ struct NetworkNode
 	void setFinal(size_t finalLength, const VirtualMemory & memoryLayout)
 	{
 		isFinal = true;
-		nbSourcesIn = 0;
 
 		bool foundCore = false;
 		NetworkToken dummyToken = NetworkToken(Token(Address(block, 0), finalLength, Address(block, 0)));
@@ -333,11 +338,8 @@ class Network
 	void buildNetworkTokenArray(const vector<Block> &blocks, const vector<size_t> &network, vector<NetworkToken> &tokens) const;
 	void performToken(NetworkNode & source, NetworkNode & destination, SchedulerData & schedulerData);
 
-	//The bool being true mean the node got data from an additionnal block. false means it lost
-	//We assume both vectors were sorted
-	void nodesPartiallySwapped(const vector<pair<BlockID, bool>> & changesForA, const vector<pair<BlockID, bool>> & changesForB);
-	void nodeSiphonned(const BlockID & destination, const vector<BlockID> & blocksWithLessSources);
-	void pulledEverythingForNode(NetworkNode & node);
+	void sourcesForFinal(const NetworkNode & node, vector<BlockID> & sources);
+	void pulledEverythingForNode(NetworkNode & node, const vector<BlockID> & nodeSources);
 	NetworkToken findLargestToken();
 
 	NetworkNode & findNodeWithBlock(const BlockID & block)

@@ -372,7 +372,6 @@ public:
 #include "network.h"
 
 bool buildBlockVector(const vector<BSDiffMoves> & input, vector<Block> & output);
-void buildWriteCommandToFlushCacheFromNodes(const vector<NetworkNode> & nodes, const VirtualMemory & virtualMemory, const BlockID & destination, DetailedBlock & commands);
 
 namespace Scheduler
 {

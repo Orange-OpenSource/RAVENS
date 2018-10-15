@@ -51,10 +51,10 @@ DetailedBlock extractDataNecessaryInSecondary(const VirtualMemory & memoryLayout
  * In our configuration, as illustrated below, block B need `b` bytes of data from bloc A, etc...
  *
  * 	(A) - b -> (B)
- * 	 ↑			|
- * 	 |			c
- * 	 a			|
- * 	 |			↓
+ * 	 ↑          |
+ * 	 |          c
+ * 	 a          |
+ * 	 |          ↓
  * 	(D) <- d - (C)
  *
  * 	HS works by first looking for a specific patern and work on it. Specifically, three blocks (for instance, A, B and C) where the link
@@ -63,9 +63,9 @@ DetailedBlock extractDataNecessaryInSecondary(const VirtualMemory & memoryLayout
  *
  * 	(A) <- ≤ b - (B)
  * 	 ↑ \
- * 	 |	\
- * 	 a	 ↳ c --.
- * 	 |			↓
+ * 	 |  \
+ * 	 a   ↳ c --.
+ * 	 |          ↓
  * 	(D) <- d - (C)
  *
  * 	This new configuration effectively remove B from the cycle and thus the algorithm can be executed again until only two blocks are left in the cycle,
@@ -81,24 +81,19 @@ DetailedBlock extractDataNecessaryInSecondary(const VirtualMemory & memoryLayout
 //First has the largest outgoing link
 void Scheduler::halfSwapCodeGeneration(NetworkNode & firstNode, NetworkNode & secNode, VirtualMemory & memoryLayout, SchedulerData & commands)
 {
+	/*
+	 *	Although it would be pretty nice, we can't enable the node swap for HSwap in the current state of things.
+	 * This is because we don't really know what content goes where, and thus how to simulate flushCacheToBlock before having loaded everything.
+	 * This could be fixed by reimplementing performToken, or simply use it at some computational cost when building the update.
+	 */
 	Scheduler::partialSwapCodeGeneration(firstNode, secNode, [&](const BlockID & block, bool, VirtualMemory& memoryLayout, SchedulerData& commands)
 	{
 		commands.insertCommand({ERASE, block});
 
-		//FIXME: make swap of nodes possible
 		if(block == secNode.block)
-		{
 			memoryLayout.writeTaggedToBlock(block, secNode.blockFinalLayout, commands);
-		}
 		else
-		{
-			//This is tricky, we need to look in the cache to get all the virtual addresses currently loaded.
-			//	Then, we build a DetailedBlock and use it to write the block
-
-			DetailedBlock writeCommands(block);
-			buildWriteCommandToFlushCacheFromNodes({firstNode, secNode}, memoryLayout, block, writeCommands);
-			memoryLayout.cacheWrite(block, writeCommands, true, commands);
-		}
+			memoryLayout.flushCacheToBlock(block, true, commands);
 
 	}, memoryLayout, commands, false);
 }
@@ -136,7 +131,6 @@ void Scheduler::partialSwapCodeGeneration(const NetworkNode & firstNode, const N
 		memoryLayout.commitCachedWrite(commands);
 
 		DetailedBlock necessaryDataInSecondary = extractDataNecessaryInSecondary(memoryLayout, {firstNode, secNode}, secondBlockID);
-		memoryLayout.flushCache();
 
 		//We can load the data in CACHE_BUF
 		memoryLayout.loadTaggedToTMP(necessaryDataInSecondary, commands);
@@ -245,20 +239,15 @@ void Scheduler::networkSwapCodeGeneration(const NetworkNode & firstNode, const N
 		//We erase the page we're about to write
 		commands.insertCommand({ERASE, block});
 
+		const NetworkNode & curNode = block == firstNode.block ? firstNode : secNode;
 		const bool firstWrite = block == (didReverse ? firstNode.block : secNode.block);
 
 		if(firstWrite)
 		{
-			//Blocks may be swapped internally
-			if(block == secNode.block)
-				memoryLayout.writeTaggedToBlock(secNode.block, secNode.compileLayout(), commands, !secNode.isFinal);
-			else
-				memoryLayout.writeTaggedToBlock(firstNode.block, firstNode.compileLayout(), commands, !firstNode.isFinal);
+			memoryLayout.writeTaggedToBlock(curNode.block, curNode.compileLayout(), commands, !curNode.isFinal);
 		}
 		else
 		{
-			const NetworkNode & curNode = didReverse ? secNode : firstNode;
-
 			if(curNode.isFinal)
 			{
 				memoryLayout.writeTaggedToBlock(curNode.block, curNode.compileLayout(), commands, false);
