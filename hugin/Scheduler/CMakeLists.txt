@@ -3,9 +3,6 @@ project(Scheduler)
 
 include_directories(../../common/)
 
-set (CMAKE_CXX_STANDARD 14)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -pedantic -Wunreachable-code -Wuninitialized -Wno-reorder")
-
 add_library(Scheduler graph.cpp scheduler.cpp scheduler.h scheduler_passes.cpp scheduler_utils.cpp Address.h Token.h Block.h DetailedBlock.h scheduler_codegen.cpp networks.cpp network.h config.h cache_management.cpp public_command.h validation.cpp validation.h bsdiff_testing.cpp virtual_machine.cpp scheduler_codegen_optim.cpp VirtualMemory.h)
 target_include_directories(Scheduler PRIVATE ../../common/crypto/)
 

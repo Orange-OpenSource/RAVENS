@@ -96,8 +96,8 @@ struct Command
 			: Command(_command, coreBlock, coreBlockOffset, length, secBlock, 0) {}
 
 	Command(const PublicCommand & pub) : command(pub.command), mainBlock(pub.mainAddress),
-										 length(pub.length), secondaryBlock(pub.secondaryAddress),
 										 mainBlockOffset(pub.mainAddress & BLOCK_OFFSET_MASK),
+										 length(pub.length), secondaryBlock(pub.secondaryAddress),
 										 secondaryOffset(pub.secondaryAddress & BLOCK_OFFSET_MASK), transactionID(0) {}
 
 	void print(FILE * file = stdout) const

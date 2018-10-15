@@ -36,6 +36,7 @@ __FBSDID("$FreextraBufferSD: src/usr.bin/bsdiff/bsdiff/bsdiff.c,v 1.1 2005/08/06
 #include <string>
 #include <cstdio>
 #include <cassert>
+#include <climits>
 
 #define BSDIFF_PRIVATE
 
@@ -44,6 +45,10 @@ __FBSDID("$FreextraBufferSD: src/usr.bin/bsdiff/bsdiff/bsdiff.c,v 1.1 2005/08/06
 #include <lzfx-4k/lzfx.h>
 #include "../Encoding/encoder.h"
 #include <layout.h>
+
+#ifndef OFF_MAX
+	#define OFF_MAX ~((off_t)1 << (sizeof(off_t) * 8 - 1))
+#endif
 
 using namespace std;
 
@@ -54,8 +59,10 @@ void bsdiff(const uint8_t * old, size_t oldSize, const uint8_t * newer, size_t n
 
 	if(index == nullptr || value == nullptr)
 		err(1, "Malloc error");
+	
+	assert(oldSize <= OFF_MAX);
 
-	qsufsort(index, value, old, oldSize);
+	qsufsort(index, value, old, (off_t) oldSize);
 
 	free(value);
 

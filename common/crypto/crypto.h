@@ -61,8 +61,8 @@ bool hashFile(const char * filename, uint8_t * hashBuffer, size_t skip);
 // High level testing functions
 
 bool generateKeys(const char * privKeyFile, const char * pubKeyFile);
-void testSignature(const uint8_t * message, bool wantFail, const char * privKeyFile, const char * pubKeyFile);
-void testCrypto();
+bool testSignature(const uint8_t * message, bool wantFail, const char * privKeyFile, const char * pubKeyFile);
+bool testCrypto();
 bool signFile(const char *inputFile, const char *outputFile, const char *privKeyFile);
 bool signString(const char * inputString, const char * privKeyFile, uint8_t * signature);
 bool verifyFile(const char *inputFile, const char * pubKeyFile);

@@ -163,7 +163,7 @@ void printSignature(const uint8_t sig[hydro_sign_BYTES])
 	}
 }
 
-void testSignature(const uint8_t * message, bool wantFail, const char * privKeyFile, const char * pubKeyFile)
+bool testSignature(const uint8_t * message, bool wantFail, const char * privKeyFile, const char * pubKeyFile)
 {
 	const size_t messageLength = strlen((const char *) message);
 	char hexMessage[messageLength * 2 + 1];
@@ -177,9 +177,10 @@ void testSignature(const uint8_t * message, bool wantFail, const char * privKeyF
 	if(!signString(hexMessage, privKeyFile, sig))
 	{
 		fputs("Signature failure\n", stderr);
-		return;
+		return false;
 	}
 
+	bool output = true;
 	if(wantFail)
 	{
 		uint8_t publicKey[hydro_sign_PUBLICKEYBYTES];
@@ -198,7 +199,7 @@ void testSignature(const uint8_t * message, bool wantFail, const char * privKeyF
 				if(validateSignature(message, messageLength, sig, publicKey))
 				{
 					fputs("Validated an incorrect signature!\n", stderr);
-					return;
+					return false;
 				}
 
 				//Restore the bit
@@ -216,29 +217,28 @@ void testSignature(const uint8_t * message, bool wantFail, const char * privKeyF
 		char signatureHex[SIGNATURE_LENGTH * 2 + 1];
 		hydro_bin2hex(signatureHex, sizeof(signatureHex), sig, sizeof(sig));
 
-		if(verifyString(message, messageLength, signatureHex, false, pubKeyFile))
-		{
-			printf("Success!\n");
-		}
-		else
+		if(!verifyString(message, messageLength, signatureHex, false, pubKeyFile))
 		{
 			fputs("FAIL!\n", stderr);
+			output = false;
 		}
 	}
+	
+	return output;
 }
 
-void testCrypto()
+bool testCrypto()
 {
 	char namePub[L_tmpnam], namePriv[L_tmpnam];
 	if (!tmpnam(namePub) || !tmpnam(namePriv))
 	{
 		puts("\tIO error");
-		return;
+		return false;
 	}
 
 	if(!generateKeys(namePriv, namePub))
-		return;
+		return false;
 
-	testSignature((const uint8_t*) "UGluayBmbHVmZnkgdW5pY29ybiBkYW5jaW5nIG9uIHJhaW5ib3dzDQpQaW5rIGZsdWZmeSB1bmljb3JuIGRhbmNpbmcgb24gcmFpbmJvd3MNClBpbmsgZmx1ZmZ5IHVuaWNvcm4gZGFuY2luZyBvbiByYWluYm93cw==", true, namePriv, namePub);
+	return testSignature((const uint8_t*) "UGluayBmbHVmZnkgdW5pY29ybiBkYW5jaW5nIG9uIHJhaW5ib3dzDQpQaW5rIGZsdWZmeSB1bmljb3JuIGRhbmNpbmcgb24gcmFpbmJvd3MNClBpbmsgZmx1ZmZ5IHVuaWNvcm4gZGFuY2luZyBvbiByYWluYm93cw==", true, namePriv, namePub);
 }
 

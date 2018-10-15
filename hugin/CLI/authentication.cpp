@@ -66,12 +66,12 @@ bool authenticate(vector<VersionData> & versions, const char * inputPath, const 
 
 		const string inputManifest(inputString + "/" + version.manifest2Path);
 
-		UpdateHeader manifest1{};
-
+		UpdateHeader manifest1;
+		memset(&manifest1, 0, sizeof(manifest1));
 		manifest1.sectionSignedDeviceKey.formatVersion = MANIFEST_FORMAT_VERSION;
 
 		//Get manifest2 size
-		struct stat st{};
+		struct stat st;
 		if(stat(inputManifest.c_str(), &st) != 0)
 		{
 			cerr << "Couldn't get metadata on " << version.manifest2Path << ". Aborting" << endl;
@@ -127,10 +127,10 @@ bool authenticate(vector<VersionData> & versions, const char * inputPath, const 
 			//Append SingleHashRequest
 			for(uint16_t i = 0; i < numberValidation; ++i)
 			{
-				SingleHashRequest curHashRequest{};
-
-				curHashRequest.start = version.rangesToCheckBeforeUpdate[i].start;
-				curHashRequest.length = version.rangesToCheckBeforeUpdate[i].length;
+				SingleHashRequest curHashRequest{
+					.start = version.rangesToCheckBeforeUpdate[i].start,
+					.length = version.rangesToCheckBeforeUpdate[i].length
+				};
 
 				memcpy(&hashVerificationBuffer[bufferIndex], &curHashRequest, sizeof(curHashRequest));
 				bufferIndex += sizeof(curHashRequest);

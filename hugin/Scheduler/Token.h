@@ -64,8 +64,8 @@ struct NetworkToken
 	BlockID destinationBlockID;
 	size_t length;
 
-	NetworkToken(const Token & token) : sourceToken({token}), sourceBlockID(token.origin), destinationBlockID(token.finalAddress), length(token.length), cleared(false) {}
-	NetworkToken(const vector<Token> & tokens) : sourceToken(tokens), sourceBlockID(tokens.empty() ? Address(0) : tokens.front().origin), destinationBlockID(tokens.empty() ? Address(0) : tokens.front().finalAddress), length(0), cleared(false)
+	NetworkToken(const Token & token) : cleared(false), sourceToken({token}), sourceBlockID(token.origin), destinationBlockID(token.finalAddress), length(token.length) {}
+	NetworkToken(const vector<Token> & tokens) : cleared(false), sourceToken(tokens), sourceBlockID(tokens.empty() ? Address(0) : tokens.front().origin), destinationBlockID(tokens.empty() ? Address(0) : tokens.front().finalAddress), length(0)
 	{
 		for(const auto &token : sourceToken)
 		{
