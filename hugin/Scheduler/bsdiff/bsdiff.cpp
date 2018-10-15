@@ -224,6 +224,49 @@ void bsdiff(const char * oldFile, const char * newFile, vector<BSDiffPatch> & pa
 	free(newer);
 }
 
+void SchedulerPatch::compactBSDiff()
+{
+	if(bsdiff.size() < 2)
+		return;
+	
+	std::vector<BSDiff> newBSDiff;
+	newBSDiff.reserve(bsdiff.size());
+	newBSDiff.emplace_back(bsdiff.front());
+
+	for(auto bsdiffIter = bsdiff.cbegin() + 1; bsdiffIter != bsdiff.cend(); ++bsdiffIter)
+	{
+		//We can extend the BSDiff
+		if(newBSDiff.back().extra.length == 0)
+		{
+			newBSDiff.back().extra = bsdiffIter->extra;
+
+			const size_t nextDeltaLength = bsdiffIter->delta.length;
+			auto & deltaSegment = newBSDiff.back().delta;
+
+			deltaSegment.data = (uint8_t* ) realloc(deltaSegment.data, deltaSegment.length + nextDeltaLength);
+			memcpy(&deltaSegment.data[deltaSegment.length], bsdiffIter->delta.data, nextDeltaLength);
+			free(bsdiffIter->delta.data);
+			deltaSegment.length += nextDeltaLength;
+		}
+		else if(bsdiffIter->delta.length == 0)
+		{
+			const size_t nextExtraLength = bsdiffIter->extra.length;
+			auto & extraSegment = newBSDiff.back().extra;
+
+			extraSegment.data = (uint8_t* ) realloc(extraSegment.data, extraSegment.length + nextExtraLength);
+			memcpy(&extraSegment.data[extraSegment.length], bsdiffIter->extra.data, nextExtraLength);
+			free(bsdiffIter->extra.data);
+			extraSegment.length += nextExtraLength;
+		}
+		else
+		{
+			newBSDiff.emplace_back(*bsdiffIter);
+		}
+	}
+	
+	bsdiff = newBSDiff;
+}
+
 bool writeBSDiff(const SchedulerPatch & patch, void * output)
 {
 	size_t length;

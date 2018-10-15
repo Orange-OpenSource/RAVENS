@@ -119,6 +119,8 @@ struct SchedulerPatch
 		newRanges.clear();
 		startAddress = 0;
 	}
+
+	void compactBSDiff();
 };
 
 
