@@ -357,7 +357,7 @@ bool processSchedulerBatch(const char * configFile, char * outputDir)
 		vector<VerificationRange> preUpdateHashes;
 
 		//Generate the manifest
-		if(!runSchedulerWithFiles(oldVersion.binaryPath.c_str(), finalVersion.binaryPath.c_str(), fullOutput.c_str(), preUpdateHashes, false))
+		if(!runSchedulerWithFiles(oldVersion.binaryPath.c_str(), finalVersion.binaryPath.c_str(), fullOutput.c_str(), preUpdateHashes, false, false))
 		{
 			cerr << "Couldn't diff with version " << to_string(oldVersion.version) << " (file " << oldVersion.binaryPath << ")" << endl;
 			return false;
