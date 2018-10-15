@@ -95,7 +95,7 @@ struct NetworkNode
 
 	void refreshLargestToken(function<size_t(const NetworkToken&)> lambda)
 	{
-		if(nbSourcesOut != 0)
+		if(!isFinal && nbSourcesOut != 0)
 		{
 			size_t counter = 0;
 			largestTokenWeight = INT64_MIN;
@@ -345,7 +345,8 @@ class Network
 	//We assume both vectors were sorted
 	void nodesPartiallySwapped(const vector<pair<BlockID, bool>> & changesForA, const vector<pair<BlockID, bool>> & changesForB);
 	void nodeSiphonned(const BlockID & destination, const vector<BlockID> & blocksWithLessSources);
-	void pulledEverythingForNode(NetworkNode & node);
+	void sourcesForFinal(const NetworkNode & node, vector<BlockID> & sources);
+	void pulledEverythingForNode(NetworkNode & node, const vector<BlockID> & nodeSources);
 	NetworkToken findLargestToken();
 
 	NetworkNode & findNodeWithBlock(const BlockID & block)
