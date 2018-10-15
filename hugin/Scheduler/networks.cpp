@@ -88,6 +88,9 @@ vector<BlockID> NetworkNode::tookOverNode(const NetworkNode & pulledNode, bool b
 			//An existing chunk was siphoned
 			token->length += pulledIter->length;
 			token->sourceToken.insert(token->sourceToken.end(), pulledIter->sourceToken.begin(), pulledIter->sourceToken.end());
+			
+			if(pulledIter->destinationBlockID != block)
+				sumOut += pulledIter->length;
 
 			//Insert in a sorted array the blocks we need to lower the source count of
 			if(token->destinationBlockID != block || bypassBlockIDDrop)
