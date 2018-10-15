@@ -974,6 +974,13 @@ void Network::pulledEverythingForNode(NetworkNode & node, const vector<BlockID> 
 						currentOffset += length;
 				});
 
+				//Nothing to do. Yay!
+				if(!shouldRemoveToken && segmentsToRemove.empty())
+				{
+					token += 1;
+					continue;
+				}
+
 				size_t tokenLengthRemoved = token->length;
 
 				//We have multiple sections to remove :/
@@ -991,41 +998,59 @@ void Network::pulledEverythingForNode(NetworkNode & node, const vector<BlockID> 
 					}
 					segmentsToRemove.clear();
 
-					//If any tag section remain, we add them at the end of sourceToken, then removed the original segment. This isn't optimal as the end will be processed twice, but it's simpler
-					const size_t tokenOffset = token - sourceToken.begin();
-					auto tokenCopy = *token;
+					//We count the number of elements to reinsert
+					size_t numberOfSegmentsToReInsert = 0;
 					for(const auto & segment : chunk.segments)
 					{
-						//FIXME: Perform the insertion in place so we don't process the token twice. Ideally, would use std::move if necessary, or simply update the token if possible
 						if(segment.tagged)
 						{
-							sourceToken.emplace_back(Token(tokenCopy.finalAddress + segment.source.value, segment.length, tokenCopy.origin + segment.source.value));
+							numberOfSegmentsToReInsert += 1;
 							tokenLengthRemoved -= segment.length;
 						}
 					}
-
-					//We refresh the iterator, as it may have been invalidated by emplace_back
-					token = sourceToken.begin() + tokenOffset;
 					
-					//Alright, we can now remove the original token
-					shouldRemoveToken = true;
+					//Actually, everything has to go
+					shouldRemoveToken = numberOfSegmentsToReInsert == 0;
+					
+					auto tokenBackup = *token;
+					for(auto & segment : chunk.segments)
+					{
+						if(segment.tagged)
+						{
+							token->finalAddress += segment.source.value;
+							token->origin += segment.source.value;
+							token->length = segment.length;
+							
+							segment.tagged = false;
+							numberOfSegmentsToReInsert -= 1;
+							break;
+						}
+					}
+
+					//If we have multiple segments to reinsert, we need to make some room
+					if(numberOfSegmentsToReInsert != 0)
+					{
+						//We first create the array we will later insert
+						vector<Token> tokenToInsert;
+						tokenToInsert.reserve(numberOfSegmentsToReInsert);
+						
+						for(const auto & segment : chunk.segments)
+						{
+							if(segment.tagged)
+							{
+								tokenToInsert.emplace_back(Token(tokenBackup.finalAddress + segment.source.value, segment.length, tokenBackup.origin + segment.source.value));
+							}
+						}
+						
+						//We then ready for insertion
+						const size_t tokenOffset = token - sourceToken.begin();
+						sourceToken.insert(token + 1, tokenToInsert.cbegin(), tokenToInsert.cend());
+						token = sourceToken.begin() + tokenOffset + numberOfSegmentsToReInsert;
+					}
 				}
 
 				if(shouldRemoveToken)
 				{
-					//We update the NetworkToken length and the node's sumOut
-					assert(token->length >= tokenLengthRemoved);
-
-					//Update the node context
-					networkNode.needRefreshLargestToken = true;
-					tokenNode->length -= tokenLengthRemoved;
-
-					if(tokenNode->destinationBlockID != networkNode.block)
-					{
-						assert(networkNode.sumOut >= tokenLengthRemoved);
-						networkNode.sumOut -= tokenLengthRemoved;
-					}
-
 					//Actually erase the sourceToken
 					const size_t offset = token - sourceToken.begin();
 					sourceToken.erase(token);
@@ -1033,6 +1058,16 @@ void Network::pulledEverythingForNode(NetworkNode & node, const vector<BlockID> 
 				}
 				else
 					token += 1;
+
+				//We update the NetworkToken length and the node's sumOut
+				networkNode.needRefreshLargestToken = true;
+				tokenNode->length -= tokenLengthRemoved;
+
+				if(tokenNode->destinationBlockID != networkNode.block)
+				{
+					assert(networkNode.sumOut >= tokenLengthRemoved);
+					networkNode.sumOut -= tokenLengthRemoved;
+				}
 			}
 
 			if(tokenNode->sourceToken.empty())
