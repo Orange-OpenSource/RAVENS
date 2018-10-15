@@ -18,7 +18,7 @@ void Command::performTrivialOptimization()
 #ifdef CODEGEN_OPTIMIZATIONS
 	if(command == COPY && length == BLOCK_SIZE && mainBlockOffset == 0 && secondaryOffset == 0)
 		{
-			if(secondaryBlock != TMP_BUF && mainBlock == TMP_BUF)
+			if(secondaryBlock != CACHE_BUF && mainBlock == CACHE_BUF)
 			{
 				command = COMMIT;
 				mainBlock = secondaryBlock;
@@ -163,7 +163,7 @@ void SchedulerData::insertCommand(Command command)
 				return;
 			}
 		}
-		else if(command.mainBlock == TMP_BUF)
+		else if(command.mainBlock == CACHE_BUF)
 		{
 			//ERASE followed by an COPY from the beginning of the cache has a monolithic instruction
 			if(prev.command == ERASE && command.command == COPY && command.mainBlockOffset == 0 &&
@@ -283,13 +283,13 @@ void SchedulerData::addUseBlocks()
 			case COPY:
 			{
 				BlockID currentBlock = iter->mainBlock;
-				if(iter->command == COPY && currentBlock == TMP_BUF)
+				if(iter->command == COPY && currentBlock == CACHE_BUF)
 					currentBlock = iter->secondaryBlock;
 
 				if(hasBlockChain && currentBlock != blockChain)
 				{
 					//Cache to cache copies are ignored
-					if(currentBlock != TMP_BUF)
+					if(currentBlock != CACHE_BUF)
 					{
 						commitUseBlockSection(newCommands, instructionIgnore, hadBlock, blockChain, startChain, iter);
 						hasBlockChain = false;
@@ -298,7 +298,7 @@ void SchedulerData::addUseBlocks()
 						instructionIgnore += 1;
 				}
 
-				if(!hasBlockChain && currentBlock != TMP_BUF)
+				if(!hasBlockChain && currentBlock != CACHE_BUF)
 				{
 					startChain = iter;
 					isStart = false;
@@ -355,7 +355,7 @@ void SchedulerData::updateLastRebase()
 			//Cases are chained. Later cases will check mainBlock
 			case COPY:
 			{
-				if(iter->secondaryBlock != TMP_BUF)
+				if(iter->secondaryBlock != CACHE_BUF)
 				{
 					if(iter->secondaryBlock < smallestBlock)
 						smallestBlock = iter->secondaryBlock;
@@ -368,7 +368,7 @@ void SchedulerData::updateLastRebase()
 				//Only check the main block if not cache
 			case CHAINED_COPY:
 			{
-				if(iter->mainBlock == TMP_BUF)
+				if(iter->mainBlock == CACHE_BUF)
 					break;
 			}
 			case ERASE:

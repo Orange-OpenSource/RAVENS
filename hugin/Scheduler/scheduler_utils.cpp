@@ -27,7 +27,7 @@ namespace Scheduler
 		for (const Token &token : block.data)
 		{
 			if(token.origin == block.blockID)
-				commands.insertCommand({COPY, TMP_BUF + token.origin.getOffset(), token.length, token.finalAddress});
+				commands.insertCommand({COPY, CACHE_BUF + token.origin.getOffset(), token.length, token.finalAddress});
 		}
 
 		if(transactionBundling)

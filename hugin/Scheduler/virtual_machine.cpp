@@ -98,7 +98,7 @@ bool virtualMachine(const vector<PublicCommand> & commands, uint8_t * flash, siz
 	bool previousWriteWasCopy = false;
 	size_t endPreviousCopy = 0;
 
-	//BLOCK_SIZE isn't necessarily constant
+	//BLOCK_SIZE isn't necessarily constant at compile time
 	uint8_t * cache = (uint8_t *) malloc(BLOCK_SIZE);
 
 	if(cache == nullptr)

@@ -12,19 +12,22 @@
 
 #include "scheduler.h"
 
-DetailedBlock extractDataNecessaryInSecondary(const VirtualMemory & memoryLayout, const NetworkNode &first, const NetworkNode &second, const BlockID & toLoad)
+DetailedBlock extractDataNecessaryInSecondary(const VirtualMemory & memoryLayout, const vector<NetworkNode> &nodes, const BlockID & toLoad)
 {
 	DetailedBlock necessaryDataInSecondary;
 
-	for(const auto & node : {first, second})
+	for(const auto & node : nodes)
 	{
 		for(const auto & netToken : node.tokens)
 		{
 			for(const auto & token : netToken.sourceToken)
 			{
-				memoryLayout.iterateTranslatedSegments(token.origin, token.length, [&](const Address& from, const size_t length, bool) {
+				size_t shift = 0;
+				memoryLayout.iterateTranslatedSegments(token.origin, token.length, [&](const Address& from, const size_t length) {
 					if(from == toLoad)
-						necessaryDataInSecondary.insertNewSegment(DetailedBlockMetadata(from, length, true));
+						necessaryDataInSecondary.insertNewSegment(DetailedBlockMetadata(token.origin + shift, length, true));
+					
+					shift += length;
 				});
 			}
 		}
@@ -82,7 +85,6 @@ void Scheduler::halfSwapCodeGeneration(NetworkNode & firstNode, NetworkNode & se
 	{
 		commands.insertCommand({ERASE, block});
 
-		//partialSwapCodeGeneration isn't allowed to swap the two nodes so we don't need to care about that
 		//FIXME: make swap of nodes possible
 		if(block == secNode.block)
 		{
@@ -98,28 +100,10 @@ void Scheduler::halfSwapCodeGeneration(NetworkNode & firstNode, NetworkNode & se
 			memoryLayout.cacheWrite(block, writeCommands, true, commands);
 		}
 
-	}, [&](bool didReverse)
-	{
-		//We tag for backup any relevant data from out node
-		const NetworkNode & curNode = didReverse ? secNode : firstNode;
-		DetailedBlock largerNodeMeta(curNode.block);
-
-		//We add the data that are required by someone else
-		for(const auto & netToken : curNode.tokens)
-		{
-			//We ignore token toward secNode (already copied)
-			if(netToken.cleared)
-				continue;
-
-			//The tokens are either already located on our page and need backup, or are already on the cache
-			for(const auto & token : netToken.sourceToken)
-				largerNodeMeta.insertNewSegment(DetailedBlockMetadata(token.origin, token.length, true));
-		}
-		return largerNodeMeta;
 	}, memoryLayout, commands, false);
 }
 
-void Scheduler::partialSwapCodeGeneration(const NetworkNode & firstNode, const NetworkNode & secNode, SwapOperator swapOperator, FirstNodeLayoutGenerator firstNodeLayout, VirtualMemory & memoryLayout, SchedulerData & commands, bool canReorder)
+void Scheduler::partialSwapCodeGeneration(const NetworkNode & firstNode, const NetworkNode & secNode, PerformCopy performCopy, VirtualMemory & memoryLayout, SchedulerData & commands, bool canReorder)
 {
 	BlockID firstBlockID = firstNode.block, secondBlockID = secNode.block;
 
@@ -151,22 +135,22 @@ void Scheduler::partialSwapCodeGeneration(const NetworkNode & firstNode, const N
 	{
 		memoryLayout.commitCachedWrite(commands);
 
-		DetailedBlock necessaryDataInSecondary = extractDataNecessaryInSecondary(memoryLayout, firstNode, secNode, secondBlockID);
+		DetailedBlock necessaryDataInSecondary = extractDataNecessaryInSecondary(memoryLayout, {firstNode, secNode}, secondBlockID);
 		memoryLayout.flushCache();
 
-		//We can load the data in TMP_BUF
-		memoryLayout.loadTaggedToTMP(necessaryDataInSecondary, commands, true);
+		//We can load the data in CACHE_BUF
+		memoryLayout.loadTaggedToTMP(necessaryDataInSecondary, commands);
 	}
 
 	//We then write back the data of second
-	swapOperator(secondBlockID, didReverse, memoryLayout, commands);
+	performCopy(secondBlockID, didReverse, memoryLayout, commands);
 
 	//We check if there is any data in the cache. Otherwise, the next write is pointless
 	//	This check is skipped if we know we're going to have to go through this write anyway (if we're writing the final version)
 	bool havePendingWrites = (didReverse ? secNode : firstNode).isFinal;
 	if(!havePendingWrites)
 	{
-		for(const auto & segment : memoryLayout.tmpLayout.segments)
+		for(const auto & segment : memoryLayout.cacheLayout.segments)
 		{
 			if(segment.tagged)
 			{
@@ -179,16 +163,14 @@ void Scheduler::partialSwapCodeGeneration(const NetworkNode & firstNode, const N
 	if(havePendingWrites)
 	{
 		//Find the data we need to save from first
-		DetailedBlock largerNodeMeta = firstNodeLayout(didReverse);
+		DetailedBlock largerNodeMeta = extractDataNecessaryInSecondary(memoryLayout, {(didReverse ? secNode : firstNode)}, firstBlockID);
 
 		//Load it in the cache
 		memoryLayout.loadTaggedToTMP(largerNodeMeta, commands);
 
 		//We then erase and write `first`
-		swapOperator(firstBlockID, didReverse, memoryLayout, commands);
+		performCopy(firstBlockID, didReverse, memoryLayout, commands);
 	}
-	else
-		memoryLayout.performRedirect();
 }
 
 void Scheduler::reorderingSwapCodeGeneration(NetworkNode & firstNode, NetworkNode & secondaryNode, VirtualMemory & memoryLayout, SchedulerData & commands)
@@ -220,10 +202,10 @@ void Scheduler::reorderingSwapCodeGeneration(NetworkNode & firstNode, NetworkNod
 	if(!cacheAlreadyLoaded && !isFirstFinal)
 	{
 		//Load the first block to TMP and erase it
-		DetailedBlock necessaryDataInSecondary = extractDataNecessaryInSecondary(memoryLayout, firstNode, secondaryNode, first);
+		DetailedBlock necessaryDataInSecondary = extractDataNecessaryInSecondary(memoryLayout, {firstNode, secondaryNode}, first);
 
-		//We can load the data in TMP_BUF
-		memoryLayout.loadTaggedToTMP(necessaryDataInSecondary, commands, true);
+		//We can load the data in CACHE_BUF
+		memoryLayout.loadTaggedToTMP(necessaryDataInSecondary, commands);
 
 		//All the data being loaded, we can flush the page corresponding to secondaryNode
 		commands.insertCommand({ERASE, first});
@@ -233,27 +215,8 @@ void Scheduler::reorderingSwapCodeGeneration(NetworkNode & firstNode, NetworkNod
 	if(!isFirstFinal)
 		memoryLayout.writeTaggedToBlock(first, (didReverse ? secondaryNode : firstNode).blockFinalLayout, commands);
 
-	/// We trust the rest of the code to empty the cache it used. This is supposed to be a closed loop so it shouldn't be a problem
-
 	//We then decide which data is interesting
-	DetailedBlock dataToLoad(second);
-	for(const auto & netToken : (didReverse ? firstNode : secondaryNode).tokens)
-	{
-		if(netToken.cleared || netToken.destinationBlockID == first)
-			continue;
-
-		for(const auto & token : netToken.sourceToken)
-		{
-			vector<DetailedBlockMetadata> translations;
-			memoryLayout.translateSegment(token.origin, token.length, translations);
-			for(const auto & translation : translations)
-			{
-				//We may want to ignore segment if they're referring to duplicated data
-				if(translation.source == second)
-					dataToLoad.insertNewSegment(DetailedBlockMetadata(translation.source, translation.length, true));
-			}
-		}
-	}
+	DetailedBlock dataToLoad = extractDataNecessaryInSecondary(memoryLayout, {didReverse ? firstNode : secondaryNode}, second);
 
 #ifdef IGNORE_CACHE_LAYOUT
 	//We really don't care about the layout in the cache of the data we're loading so we're offering an opportunity for sequential load
@@ -262,15 +225,14 @@ void Scheduler::reorderingSwapCodeGeneration(NetworkNode & firstNode, NetworkNod
 #endif
 
 	//We load data from the secondary buffer in the temporary buffer
-	memoryLayout.loadTaggedToTMP(dataToLoad, commands, true);
+	memoryLayout.loadTaggedToTMP(dataToLoad, commands);
 
 	//Copy back the data from the temporary buffer
 	commands.insertCommand({ERASE, second});
 	memoryLayout.writeTaggedToBlock(second, didReverse ? firstNode.blockFinalLayout : secondaryNode.blockFinalLayout, commands);
-	memoryLayout.performRedirect();
 
 #ifdef VERY_AGGRESSIVE_ASSERT
-	for(const auto & segment : memoryLayout.tmpLayout.segments)
+	for(const auto & segment : memoryLayout.cacheLayout.segments)
 		assert(!segment.tagged);
 #endif
 }
@@ -289,9 +251,9 @@ void Scheduler::networkSwapCodeGeneration(const NetworkNode & firstNode, const N
 		{
 			//Blocks may be swapped internally
 			if(block == secNode.block)
-				memoryLayout.writeTaggedToBlock(secNode.block, secNode.compileLayout(true, memoryLayout), commands, !secNode.isFinal);
+				memoryLayout.writeTaggedToBlock(secNode.block, secNode.compileLayout(), commands, !secNode.isFinal);
 			else
-				memoryLayout.writeTaggedToBlock(firstNode.block, firstNode.compileLayout(true, memoryLayout), commands, !firstNode.isFinal);
+				memoryLayout.writeTaggedToBlock(firstNode.block, firstNode.compileLayout(), commands, !firstNode.isFinal);
 		}
 		else
 		{
@@ -299,23 +261,16 @@ void Scheduler::networkSwapCodeGeneration(const NetworkNode & firstNode, const N
 
 			if(curNode.isFinal)
 			{
-				memoryLayout.writeTaggedToBlock(curNode.block, curNode.compileLayout(true, memoryLayout), commands, false);
-				memoryLayout.performRedirect();
+				memoryLayout.writeTaggedToBlock(curNode.block, curNode.compileLayout(), commands, false);
 
 #ifdef VERY_AGGRESSIVE_ASSERT
-				for(const auto & segment : memoryLayout.tmpLayout.segments)
+				for(const auto & segment : memoryLayout.cacheLayout.segments)
 					assert(!segment.tagged);
 #endif
 			}
 			else
-				memoryLayout.cacheWrite(curNode.block, curNode.compileLayout(true, memoryLayout), true, commands);
+				memoryLayout.cacheWrite(curNode.block, curNode.compileLayout(), true, commands);
 		}
-
-	}, [&](bool didReverse)
-	{
-		const NetworkNode & curNode = didReverse ? secNode : firstNode;
-		return curNode.compileLayout(false, memoryLayout);
-
 	}, memoryLayout, commands, true);
 }
 
@@ -325,14 +280,14 @@ void Scheduler::pullDataToNode(const NetworkNode & node, VirtualMemory & memoryL
 		memoryLayout.commitCachedWrite(commands);
 
 	//Load the first block to TMP and erase it
-	DetailedBlock necessaryDataInSecondary = extractDataNecessaryInSecondary(memoryLayout, node, node, node.block);
+	DetailedBlock necessaryDataInSecondary = extractDataNecessaryInSecondary(memoryLayout, {node}, node.block);
 
-	//We can load the data in TMP_BUF
-	memoryLayout.loadTaggedToTMP(necessaryDataInSecondary, commands, true);
+	//We can load the data in CACHE_BUF
+	memoryLayout.loadTaggedToTMP(necessaryDataInSecondary, commands);
 
 	//All the data being loaded, we can flush the page corresponding to the node
 	commands.insertCommand({ERASE, node.block});
 
 	//Then write the final layout
-	memoryLayout.writeTaggedToBlock(node.block, node.compileLayout(true, memoryLayout), commands, false);
+	memoryLayout.writeTaggedToBlock(node.block, node.compileLayout(), commands, false);
 }

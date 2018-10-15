@@ -173,7 +173,7 @@ bool NetworkNode::dispatchInNodes(NetworkNode & node1, NetworkNode & node2)
 	size_t lengthToAllocate = getOccupationLevel();
 	vector<pair<size_t, size_t>> spaceLeftAfterward;
 	bool needReloop, didReloopOnce = false;
-	BlockID reloopSource(TMP_BUF), reloopDest(TMP_BUF);
+	BlockID reloopSource(CACHE_BUF), reloopDest(CACHE_BUF);
 
 	assert(lengthToAllocate <= 2 * BLOCK_SIZE);
 
@@ -324,11 +324,11 @@ bool NetworkNode::dispatchInNodes(NetworkNode & node1, NetworkNode & node2)
 	return needDivide;
 }
 
-DetailedBlock NetworkNode::compileLayout(bool wantWriteLayout, const VirtualMemory & memoryLayout) const
+DetailedBlock NetworkNode::compileLayout() const
 {
 	DetailedBlock output(block);
 	//If we are the final form, we sadly must respect blockFinalLayout, possibly at the cost of extra fragmentation
-	if(wantWriteLayout && isFinal)
+	if(isFinal)
 		output = blockFinalLayout;
 
 	//We have to fit everything left in tokens in output
@@ -336,7 +336,7 @@ DetailedBlock NetworkNode::compileLayout(bool wantWriteLayout, const VirtualMemo
 	{
 		//The self reference contains all the data that belong here, which may be more than what is actually in the cache
 		const bool isOversizedSelfReference = isFinal && netToken.destinationBlockID == block;
-		if(wantWriteLayout && isOversizedSelfReference)
+		if(isOversizedSelfReference)
 			continue;
 
 		for (auto token : netToken.sourceToken)
@@ -368,25 +368,8 @@ DetailedBlock NetworkNode::compileLayout(bool wantWriteLayout, const VirtualMemo
 
 			if(token.length > 0)
 			{
-				//We're looking for data to load in the cache. We have to exclude what is going to be imported (no point in copying that into the cache, as we're not erasing it)
-				if(!wantWriteLayout && isOversizedSelfReference)
-				{
-					size_t processedLength = 0;
-					memoryLayout.iterateTranslatedSegments(token.origin, token.length, [&](const Address & from, const size_t length, bool) {
-						if(from == block)
-						{
-							const bool result = output.fitSegmentInUntagged({Token(token.origin + processedLength, length, token.origin + processedLength), true});
-							assert(result);
-						}
-						processedLength += length;
-					});
-				}
-				else
-				{
-					const bool result = output.fitSegmentInUntagged({token, true});
-					assert(result);
-				}
-
+				const bool result = output.fitSegmentInUntagged({token, true});
+				assert(result);
 			}
 		}
 	}
@@ -916,6 +899,8 @@ void Network::pulledEverythingForNode(NetworkNode & node)
 			//Clear all token toward us
 			for(auto & token : networkNode.tokens)
 			{
+				//FIXME: we don't look for token we siphoned when turning final which were not explicitely aimed at us (because the data is duplicated)
+				//	The cheapest fix would likely to cache the blocks with incomming data when turning final, but before the VM is updated
 				if(!token.cleared && token.destinationBlockID == node.block)
 				{
 					//We may have a token due to an internal transfer

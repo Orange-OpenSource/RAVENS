@@ -32,7 +32,7 @@ using namespace std;
 
 #include "public_command.h"
 
-#define TMP_BUF Address(CACHE_ADDRESS)
+#define CACHE_BUF Address(CACHE_ADDRESS)
 
 #include "Address.h"
 #include "Encoding/encoder.h"
@@ -109,7 +109,7 @@ struct Command
 #ifdef PRINT_REAL_INSTRUCTIONS
 				fprintf(file, "{LOAD_AND_FLUSH, 0x%x},\n", static_cast<unsigned int>(mainBlock.value | mainBlockOffset));
 #else
-				fprintf(file, "Loading 0x%x to TMP (0x%x) then erasing\n", static_cast<unsigned int>(mainBlock.value | mainBlockOffset), static_cast<unsigned int>(TMP_BUF.getAddress()));
+				fprintf(file, "Loading 0x%x to TMP (0x%x) then erasing\n", static_cast<unsigned int>(mainBlock.value | mainBlockOffset), static_cast<unsigned int>(CACHE_BUF.getAddress()));
 #endif
 				break;
 			}
@@ -118,7 +118,7 @@ struct Command
 #ifdef PRINT_REAL_INSTRUCTIONS
 				fprintf(file, "{COMMIT, 0x%x},\n", static_cast<unsigned int>(mainBlock.value | mainBlockOffset));
 #else
-				fprintf(file, "Writing TMP to 0x%x (0x%x)\n", static_cast<unsigned int>(TMP_BUF.getAddress()), static_cast<unsigned int>(mainBlock.value | mainBlockOffset));
+				fprintf(file, "Writing TMP to 0x%x (0x%x)\n", static_cast<unsigned int>(CACHE_BUF.getAddress()), static_cast<unsigned int>(mainBlock.value | mainBlockOffset));
 #endif
 				break;
 			}
@@ -127,7 +127,7 @@ struct Command
 #ifdef PRINT_REAL_INSTRUCTIONS
 				fprintf(file, "{FLUSH_AND_PARTIAL_COMMIT, 0x%x, 0x%x},\n", static_cast<unsigned int>(mainBlock.value), static_cast<unsigned  int>(length));
 #else
-				fprintf(file, "Wipping 0x%x then writting TMP (0x%x)\n", static_cast<unsigned int>(mainBlock.value | mainBlockOffset), static_cast<unsigned int>(TMP_BUF.getAddress()));
+				fprintf(file, "Wipping 0x%x then writting TMP (0x%x)\n", static_cast<unsigned int>(mainBlock.value | mainBlockOffset), static_cast<unsigned int>(CACHE_BUF.getAddress()));
 #endif
 				break;
 			}
@@ -232,7 +232,7 @@ struct Command
 	{
 		return command == COPY && length == BLOCK_SIZE
 			   && mainBlockOffset == 0 && secondaryOffset == 0
-			   && mainBlock != TMP_BUF && secondaryBlock == TMP_BUF;
+			   && mainBlock != CACHE_BUF && secondaryBlock == CACHE_BUF;
 	}
 
 	bool isCommitLike() const
@@ -381,12 +381,11 @@ namespace Scheduler
 	void removeUnidirectionnalReferences(vector<Block> & blocks, SchedulerData & commands);
 	void removeNetworks(vector<Block> & blocks, SchedulerData & commands);
 
-	typedef function<void(const BlockID&, bool, VirtualMemory&, SchedulerData&)> SwapOperator;
-	typedef function<DetailedBlock(bool)> FirstNodeLayoutGenerator;
+	typedef function<void(const BlockID&, bool, VirtualMemory&, SchedulerData&)> PerformCopy;
 
 	//Codegen utils
 	void halfSwapCodeGeneration(NetworkNode & firstNode, NetworkNode & secNode, VirtualMemory & memoryLayout, SchedulerData & commands);
-	void partialSwapCodeGeneration(const NetworkNode & firstNode, const NetworkNode & secNode, SwapOperator swapOperator, FirstNodeLayoutGenerator firstNodeLayout, VirtualMemory & memoryLayout, SchedulerData & commands, bool canReorder);
+	void partialSwapCodeGeneration(const NetworkNode & firstNode, const NetworkNode & secNode, PerformCopy performCopy, VirtualMemory & memoryLayout, SchedulerData & commands, bool canReorder);
 	void reorderingSwapCodeGeneration(NetworkNode & firstNode, NetworkNode & secondaryNode, VirtualMemory & memoryLayout, SchedulerData & commands);
 	void networkSwapCodeGeneration(const NetworkNode & firstNode, const NetworkNode & secNode, VirtualMemory & memoryLayout, SchedulerData & commands);
 	void pullDataToNode(const NetworkNode & node, VirtualMemory & memoryLayout, SchedulerData & commands);

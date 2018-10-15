@@ -123,8 +123,12 @@ struct DetailedBlock
 		size_t length = segments.size() - 1, i = 0;
 		while (i < length)
 		{
+			//We don't want to compact over page boundaries. It doesn't provide much (any?) performance advantage, for a lot of headaches
+			if(segments[i].source.getBlock() != segments[i + 1].source.getBlock())
+				i += 1;
+			
 			//The source of the data in those two chunks is contiguous and they have the same tag status
-			if (segments[i].source.getAddress() + segments[i].length == segments[i + 1].source.getAddress()
+			else if (segments[i].source.getAddress() + segments[i].length == segments[i + 1].source.getAddress()
 				&& segments[i].tagged == segments[i + 1].tagged)
 			{
 				//We lengthen the first segment and delete the next
@@ -230,60 +234,6 @@ struct DetailedBlock
 		{
 			if(!segment.tagged)
 				segment.source = segment.destination;
-		}
-	}
-
-	void splitAtIndex(vector<DetailedBlockMetadata> &segmentsVector, const Address & destinationToMatch, size_t length)
-	{
-		//We need to split the translation table so needToSkipCache can make a granular decision
-		vector<DetailedBlockMetadata>::iterator section = lower_bound(segmentsVector.begin(), segmentsVector.end(), destinationToMatch, [](const DetailedBlockMetadata & a, const Address & b) { return (a.destination.value + a.length) <= b.value; });
-
-		//Address is outside the translation table
-		if(section == segmentsVector.end())
-			return;
-
-		if(!section->overlapWith(section->destination, section->length, destinationToMatch, 1))
-			return;
-
-		//The segment start before us
-		if(section->destination.value != destinationToMatch.value)
-		{
-			const size_t delta = destinationToMatch.value - section->destination.value;
-
-			//Preceding segment
-			DetailedBlockMetadata newMeta = *section;
-			newMeta.length = delta;
-
-			section->destination += delta;
-			section->source += delta;
-			section->length -= delta;
-
-			auto offset = section - segmentsVector.begin();
-
-			segmentsVector.insert(section, newMeta);
-			section = segmentsVector.begin() + offset + 1;
-		}
-
-		for(; length != 0 && section != segmentsVector.end(); ++section)
-		{
-			//The segment is already shorter
-			if(section->length <= length)
-			{
-				length -= section->length;
-			}
-				//We're at the end, we need to split the segment
-			else
-			{
-				DetailedBlockMetadata newMeta = *section;
-				newMeta.length = length;
-
-				section->destination += length;
-				section->source += length;
-				section->length -= length;
-				length = 0;
-
-				segmentsVector.insert(section, newMeta);
-			}
 		}
 	}
 

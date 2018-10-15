@@ -20,8 +20,8 @@
 
 struct CacheMemory : public DetailedBlock
 {
-	CacheMemory() : DetailedBlock(TMP_BUF) {}
-	CacheMemory(const BlockID & block) : DetailedBlock(TMP_BUF)
+	CacheMemory() : DetailedBlock(CACHE_BUF) {}
+	CacheMemory(const BlockID & block) : DetailedBlock(CACHE_BUF)
 	{
 		segments.front().source = {block, 0};
 	}
@@ -36,7 +36,7 @@ struct CacheMemory : public DetailedBlock
 	void flush()
 	{
 		segments.clear();
-		segments.emplace_back(DetailedBlockMetadata(TMP_BUF, BLOCK_SIZE));
+		segments.emplace_back(DetailedBlockMetadata(CACHE_BUF, BLOCK_SIZE));
 	}
 
 	bool isEmpty() const
@@ -63,10 +63,17 @@ struct CacheMemory : public DetailedBlock
 		return room;
 	}
 
-	vector<pair<size_t, bool>> segmentInCache(Address base, size_t length) const
+	vector<DetailedBlockMetadata> segmentInCache(Address base, size_t length) const
 	{
-		vector<pair<size_t, bool>> output;
+		vector<DetailedBlockMetadata> output;
 		size_t skipLength = 0;
+		
+#ifdef VERY_AGGRESSIVE_ASSERT
+		const size_t realLength = length;
+#endif
+		//This algorithm iterate the cache, and look for segments containing its head (base).
+		//	If it can't find its head, it's looking for the shortest `skipLength`, which will be used to skip ahead and mark the ignored area as missing from the cache
+		//This isn't a straightforward implementation because fragments of the segment we're looking for can be in any order
 
 		for(auto iter = segments.cbegin(); iter != segments.cend() && length != 0;)
 		{
@@ -78,7 +85,8 @@ struct CacheMemory : public DetailedBlock
 					const size_t shift = base.getAddress() - iter->source.getAddress();
 					const size_t newSegmentLength = MIN(iter->length - shift, length);
 
-					output.emplace_back(newSegmentLength, true);
+					assert(newSegmentLength != 0);
+					output.emplace_back(iter->destination + shift, base, newSegmentLength, true);
 
 					base += newSegmentLength;
 					length -= newSegmentLength;
@@ -88,7 +96,10 @@ struct CacheMemory : public DetailedBlock
 				}
 				else
 				{
-					skipLength = iter->source.getAddress() - base.getAddress();
+					//We look for the shortest distance we would need to jump forward by to find a new token
+					const size_t skipToToken = iter->source.getAddress() - base.getAddress();
+					if(skipLength == 0 || skipToToken < skipLength)
+						skipLength = skipToToken;
 					iter += 1;
 				}
 			}
@@ -100,7 +111,7 @@ struct CacheMemory : public DetailedBlock
 			//Does the segment start by a section not in the cache while later parts are?
 			if(iter == segments.cend() && skipLength != 0)
 			{
-				output.emplace_back(skipLength, false);
+				output.emplace_back(base, skipLength, false);
 
 				base += skipLength;
 				length -= skipLength;
@@ -110,7 +121,15 @@ struct CacheMemory : public DetailedBlock
 		}
 
 		if(length)
-			output.emplace_back(length, false);
+			output.emplace_back(base, length, false);
+		
+#ifdef VERY_AGGRESSIVE_ASSERT
+		size_t returnedLength = 0;
+		for(const auto & segment : output)
+			returnedLength += segment.length;
+
+		assert(returnedLength == realLength);
+#endif
 
 		return output;
 	}
@@ -119,8 +138,6 @@ struct CacheMemory : public DetailedBlock
 struct TranslationTable
 {
 	unordered_map<BlockID, DetailedBlock> translationData;
-	vector<DetailedBlockMetadata> translationsToPerform;
-	unordered_set<BlockID> impactOfTranslationToPerform;
 
 	TranslationTable(const vector<Block> &blocks)
 	{
@@ -152,52 +169,34 @@ struct TranslationTable
 		}
 	}
 
-	void splitAtIndex(const Address & destinationToMatch, size_t length)
+	void redirect(const Address &addressToRedirect, size_t length, const Address &newBaseAddress)
 	{
-		auto translationArray = translationData.find(destinationToMatch.getBlock());
+		assert(length > 0);
+
+		auto translationArray = translationData.find(addressToRedirect.getBlock());
 		if(translationArray != translationData.end())
 		{
-			translationArray->second.splitAtIndex(translationArray->second.segments, destinationToMatch, length);
+			//Translations must fit in a single page
+			assert((addressToRedirect.value & BLOCK_OFFSET_MASK) + length <= BLOCK_SIZE);
+			translationArray->second.insertNewSegment(DetailedBlockMetadata(newBaseAddress, addressToRedirect, length, true));
 		}
 	}
 
-	//We can't perform redirections one by one due to the risk of the cache origin becoming inconsistent
-	//Basically, if we do that and overwrite the source of the data, writes would confuse the (obsolete) data in cache and the fresh data
-	void staggeredRedirect(const Address &addressToRedirect, size_t length, const Address &newBaseAddress)
-	{
-		translationsToPerform.emplace_back(DetailedBlockMetadata(newBaseAddress, addressToRedirect, length, true));
-		impactOfTranslationToPerform.insert(addressToRedirect.getBlock());
-		splitAtIndex(addressToRedirect, length);
-	}
-
-	void performRedirect()
-	{
-		for(const auto & translation : translationsToPerform)
-		{
-			const BlockID & block = translation.destination.getBlock();
-
-			//We ignore redirections for data outside the graph/network
-
-			auto translationArray = translationData.find(block);
-			if(translationArray != translationData.end())
-			{
-				//Translations must fit in a single page
-				assert((translation.destination.value & BLOCK_OFFSET_MASK) + translation.length <= BLOCK_SIZE);
-				translationArray->second.insertNewSegment(translation);
-			}
-		}
-
-		translationsToPerform.clear();
-		impactOfTranslationToPerform.clear();
-	}
-
-	void translateSegment(Address from, size_t length, function<void(const Address&, const size_t, bool)>processing) const
+	void translateSegment(Address from, size_t length, function<void(const Address&, const size_t)>processing) const
 	{
 #ifdef VERY_AGGRESSIVE_ASSERT
 		bool finishedSection = false;
 #endif
 
-		assert((from.value & BLOCK_OFFSET_MASK) + length <= BLOCK_SIZE);
+		while((from.value & BLOCK_OFFSET_MASK) + length > BLOCK_SIZE)
+		{
+			const size_t spaceLeft = BLOCK_SIZE - (from.value & BLOCK_OFFSET_MASK);
+			const size_t writeToPerform = MIN(spaceLeft, length);
+			translateSegment(from, writeToPerform, processing);
+			
+			from += writeToPerform;
+			length -= writeToPerform;
+		}
 
 		//We detect the beginning of the potentially matching section
 		const auto currentTranslation = translationData.find(from.getBlock());
@@ -205,7 +204,7 @@ struct TranslationTable
 		//The address is outside the virtual memory
 		if(currentTranslation == translationData.end())
 		{
-			return processing(from, length, true);
+			return processing(from, length);
 		}
 
 		const auto & currentTranslationData = currentTranslation->second.segments;
@@ -227,9 +226,7 @@ struct TranslationTable
 				const int64_t shiftToReal = iter->source.getAddress() - iter->destination.getAddress();
 				Address shiftedFrom(from + shiftToReal);
 
-				const bool needIgnoreCache = needToSkipCache(shiftedFrom, from, lengthToCopy);
-
-				processing(shiftedFrom, lengthToCopy, needIgnoreCache);
+				processing(shiftedFrom, lengthToCopy);
 
 				length -= lengthToCopy;
 				from += lengthToCopy;
@@ -244,34 +241,6 @@ struct TranslationTable
 
 		//Have we performed the translation in full
 		assert(length == 0);
-	}
-
-	//The cache may be bypassed in some circumstances.
-	//	A problem we face is when data A from page 0x1000 is loaded in the cache, then overwritten by B from page 0x2000.
-	//		0x2000 is then erased and need A and B. If translations were performed after writes, B would read A, thinking 0x1000 cached it
-	//	In order to fix it, translations are only performed after the cache is emptied
-	//  Therefore, we know that cache are addressed pre-translation while any address pending translation need a direct read
-
-	bool needToSkipCache(Address &read, Address &virtualRead, const size_t &length) const
-	{
-		//If the page isn't impacted in any way by translations, no need to iterate
-		if(impactOfTranslationToPerform.find(virtualRead.getBlock()) == impactOfTranslationToPerform.end())
-			return false;
-
-		for(auto pendingTranslation = translationsToPerform.crbegin(), end = translationsToPerform.crend(); pendingTranslation != end; ++pendingTranslation)
-		{
-			//Can we find a translation redirecting our virtual address?
-			if(pendingTranslation->overlapWith(virtualRead, length, pendingTranslation->destination, pendingTranslation->length))
-			{
-				//We make sure the segment fit entirely in this pending translation
-				assert(pendingTranslation->fitWithin(pendingTranslation->destination, pendingTranslation->length, virtualRead));
-				assert(pendingTranslation->fitWithin(pendingTranslation->destination, pendingTranslation->length, virtualRead + (length - 1)));
-				read = pendingTranslation->source + (virtualRead.value - pendingTranslation->destination.value);
-				return true;
-			}
-		}
-
-		return false;
 	}
 };
 
@@ -295,133 +264,88 @@ struct VirtualMemory
 	//Destination is the virtual address
 	TranslationTable translationTable;
 
-	bool hasCache;
-	CacheMemory tmpLayout;
+	CacheMemory cacheLayout;
 
 	bool hasCachedWrite;
 	bool cachedWriteIgnoreLayout;
 	BlockID cachedWriteBlock;
 	DetailedBlock cachedWriteRequest;
 
-	VirtualMemory(const vector<Block> &blocks) : tmpLayout(), translationTable(blocks), hasCache(false), hasCachedWrite(false), cachedWriteBlock(TMP_BUF), cachedWriteRequest() {}
+	VirtualMemory(const vector<Block> &blocks) : cacheLayout(), translationTable(blocks), hasCachedWrite(false), cachedWriteBlock(CACHE_BUF), cachedWriteRequest() {}
 
-	VirtualMemory(const vector<Block> &blocks, const vector<size_t> &indexes) : tmpLayout(), translationTable(blocks, indexes), hasCache(false), hasCachedWrite(false), cachedWriteBlock(TMP_BUF), cachedWriteRequest() {}
-
-	void performRedirect()
-	{
-		translationTable.performRedirect();
-
-		//FIXME: Should remove ASAP
-		flushCache();
-	}
-
-	void didComplexLoadInCache(const CacheMemory &newTmpLayout)
-	{
-		hasCache = true;
-		tmpLayout = newTmpLayout;
-	}
+	VirtualMemory(const vector<Block> &blocks, const vector<size_t> &indexes) : cacheLayout(), translationTable(blocks, indexes), hasCachedWrite(false), cachedWriteBlock(CACHE_BUF), cachedWriteRequest() {}
 
 	void flushCache()
 	{
-		hasCache = false;
-		tmpLayout.flush();
+		cacheLayout.flush();
 	}
 
 	void translateSegment(Address from, size_t length, vector<DetailedBlockMetadata> & output) const
 	{
 		output.reserve(4);
-		translationTable.translateSegment(from, length, [&output](const Address& from, const size_t length, bool) {
+		translationTable.translateSegment(from, length, [&output](const Address& from, const size_t length) {
 			output.emplace_back(DetailedBlockMetadata(from, length));
 		});
 	}
 
-	//WARNING: we assume that if we have to copy from the cache, the cache is caching a whole page (or at least everything up to a point)
-	void _generateCopyWithTranslatedAddress(const Address &realFrom, const size_t &length, Address toward, bool ignoreCache, bool unTagCache, function<void(const Address &, const size_t, const Address &)> lambda)
+	void generateCopyWithTranslatedAddress(const Address &realFrom, size_t length, Address toward, bool unTagCache, function<void(const Address &, const size_t, const Address &)> lambda)
 	{
-		//Could the data be in the cache?
-		if (hasCache && !ignoreCache)
+		//Is the data in the cache?
+		if (realFrom.getBlock() == CACHE_BUF)
 		{
-			//We were up to no good and not only loaded the data in the cache but also messed with them
-			//  Not only we need to lookup the cache layout but we need to support extra fragmentation within the cache
-			//	The cache MUST contain the full content of a segment if the VM hasn't been updated
-			//	Overwise, we assume the data left is still in place, in full ([cache | real | cache] isn't a supported layout)
-
-			bool foundSomething = false;
-			bool needAnotherRound;
-			Address currentFrom = realFrom;
-			size_t currentLength = length;
-
-			do
+#ifdef VERY_AGGRESSIVE_ASSERT
 			{
-				needAnotherRound = false;
-
-				vector<DetailedBlockMetadata> newTaggedSegments;
-
-				for (auto &tmpSegment : tmpLayout.segments)
+				bool hasCache = false;
+				for(const auto & cacheToken : cacheLayout.segments)
 				{
-					if(!tmpSegment.tagged)
-						continue;
-
-					//The source of the data match where the data at our offset is supposed to come from
-					//FIXME: We're currently ignoring matches if the beginning isn't in it. This could be fixed by generating the COPY instruction for the beginning of the segment _BEFORE_ pulling more data from the cache (otherwise, when running the instructions, we could pad with 0 the spece we just overlooked (plus, CHAINED_COPY are more efficient than COPY's)
-					if (DetailedBlockMetadata::fitWithin(tmpSegment.source, tmpSegment.length, currentFrom))
+					if(cacheToken.tagged)
 					{
-						const size_t fromOffset = currentFrom.getAddress() - tmpSegment.source.getAddress();
-						foundSomething = true;
-
-						const size_t lengthLeft = tmpSegment.length - fromOffset;
-						const size_t lengthUsed = MIN(currentLength, lengthLeft);
-						lambda(tmpSegment.destination + fromOffset, lengthUsed, toward);
-
-						if(unTagCache)
-						{
-							//We might have to fragment if the data we're getting isn't aligned on the cache buffer segments
-							if(lengthLeft != tmpSegment.length || lengthLeft != currentLength)
-							{
-								DetailedBlockMetadata newMetadata(tmpSegment.source + fromOffset, tmpSegment.destination + fromOffset, lengthUsed, true);
-								newMetadata.willUntag = true;
-								newTaggedSegments.emplace_back(newMetadata);
-							}
-							else
-								tmpSegment.willUntag = true;
-						}
-
-						if (lengthLeft < currentLength)
-						{
-							currentLength -= lengthLeft;
-							currentFrom += lengthLeft;
-							toward += lengthLeft;
-							needAnotherRound = true;
-						}
-						else
-						{
-							currentLength = 0;
-							break;
-						}
+						hasCache = true;
+						break;
 					}
 				}
-
-				//Insert the untagged fragments if necessary
-				for(const auto & fragment : newTaggedSegments)
-					tmpLayout.insertNewSegment(fragment);
-
-			} while (needAnotherRound);
-
-			if (foundSomething)
+				assert(hasCache);
+			}
+#endif
+			
+			//The logic is fairly straightforward. We copy the data from the cache, then untag it if necessary
+			lambda(realFrom, length, toward);
+			
+			if(unTagCache)
 			{
-				if (currentLength != 0)
-					lambda(currentFrom, currentLength, toward);
+				auto search = lower_bound(cacheLayout.segments.begin(), cacheLayout.segments.end(), realFrom, [](const DetailedBlockMetadata & meta, const Address & from) { return meta.destination <= from; });
+				
+				assert(search != cacheLayout.segments.begin());
+				search -= 1;
+				assert(search->destination <= realFrom);
+				
+				Address fromCopy = realFrom;
+				vector<DetailedBlockMetadata> untagSegments;
+				while (fromCopy >= search->destination && length != 0)
+				{
+					const size_t shift = fromCopy.value - search->destination.value;
+					const size_t curLength = MIN(search->length - shift, length);
+					
+					untagSegments.emplace_back(search->source + shift, fromCopy, curLength, true);
+					untagSegments.back().willUntag = true;
+					
+					fromCopy += curLength;
+					length -= curLength;
+					search += 1;
+				}
 
-				return;
+				assert(length == 0);
+				for(const auto & untag : untagSegments)
+					cacheLayout.insertNewSegment(untag);
 			}
 		}
-
-		lambda(realFrom, length, toward);
+		else
+			lambda(realFrom, length, toward);
 	}
 
 	void applyCacheWillUntag()
 	{
-		for (auto &tmpSegment : tmpLayout.segments)
+		for (auto &tmpSegment : cacheLayout.segments)
 		{
 			if(tmpSegment.tagged && tmpSegment.willUntag)
 			{
@@ -429,14 +353,6 @@ struct VirtualMemory
 				tmpSegment.willUntag = false;
 			}
 		}
-	}
-
-	void generateCopyWithTranslatedAddress(const Address &realFrom, const size_t &length, Address toward, SchedulerData &commands, bool ignoreCache, bool unTagCache = false)
-	{
-		_generateCopyWithTranslatedAddress(realFrom, length, toward, ignoreCache, unTagCache, [&commands](const Address & from, const size_t length, const Address & toward)
-		{
-			commands.insertCommand({COPY, from, length, toward});
-		});
 	}
 
 	struct LocalMetadata
@@ -461,16 +377,35 @@ struct VirtualMemory
 		{
 			if(segment.tagged)
 			{
+				//We detect whether part of the segment are in the cache. If so, no need to translate
 				size_t sourceOffset = 0;
-				//We want to perform a full translation (cache aware)
-				translationTable.translateSegment(segment.source, segment.length, [&](const Address& from, const size_t length, bool ignoreCache) {
-					_generateCopyWithTranslatedAddress(from, length, Address(destination, offset), ignoreCache, true, [&](const Address & from, const size_t length, const Address & toward) {
-						canonicalCopy.emplace_back(LocalMetadata(segment.source + sourceOffset, from, toward, length));
+				const auto arePartsInCache = cacheLayout.segmentInCache(segment.source, segment.length);
+				for(const auto & subSection : arePartsInCache)
+				{
+					//Is in cache?
+					if(subSection.tagged)
+					{
+						generateCopyWithTranslatedAddress(subSection.source, subSection.length, Address(destination, offset), true, [&](const Address & from, const size_t length, const Address & toward) {
+							assert(length > 0 && sourceOffset + length <= segment.length);
 
-						sourceOffset += length;
-						offset += length;
-					});
-				});
+							canonicalCopy.emplace_back(LocalMetadata(segment.source + sourceOffset, from, toward, length));
+
+							sourceOffset += length;
+							offset += length;
+						});
+					}
+					else
+					{
+						translationTable.translateSegment(subSection.source, subSection.length, [&](const Address& translatedFrom, const size_t translatedLength) {
+							generateCopyWithTranslatedAddress(translatedFrom, translatedLength, Address(destination, offset), true, [&](const Address & from, const size_t length, const Address & toward) {
+								canonicalCopy.emplace_back(LocalMetadata(segment.source + sourceOffset, from, toward, length));
+								
+								sourceOffset += length;
+								offset += length;
+							});
+						});
+					}
+				}
 			}
 			else
 				offset += segment.length;
@@ -487,10 +422,10 @@ struct VirtualMemory
 			{
 				if(a.source.getBlock() != b.source.getBlock())
 				{
-					if(a.source == TMP_BUF.getBlock())
+					if(a.source == CACHE_BUF.getBlock())
 						return true;
 
-					else if(b.source == TMP_BUF.getBlock())
+					else if(b.source == CACHE_BUF.getBlock())
 						return false;
 				}
 
@@ -500,7 +435,7 @@ struct VirtualMemory
 			Address toward(destination, 0);
 			for(auto & copy : canonicalCopy)
 			{
-				translationTable.staggeredRedirect(copy.virtualSource, copy.length, toward);
+				translationTable.redirect(copy.virtualSource, copy.length, toward);
 				copy.destination = toward;
 				toward += copy.length;
 			}
@@ -519,7 +454,7 @@ struct VirtualMemory
 					if(segment.destination == destination)
 						offset = segment.destination.getOffset();
 
-					translationTable.staggeredRedirect(segment.source, segment.length, Address(destination, offset));
+					translationTable.redirect(segment.source, segment.length, Address(destination, offset));
 					offset += segment.length;
 				}
 			}
@@ -552,9 +487,8 @@ struct VirtualMemory
 			writeTaggedToBlock(cachedWriteBlock, cachedWriteRequest, commands, cachedWriteIgnoreLayout);
 			hasCachedWrite = false;
 
-			performRedirect();
 #ifdef VERY_AGGRESSIVE_ASSERT
-			for(const auto & segment : tmpLayout.segments)
+			for(const auto & segment : cacheLayout.segments)
 				assert(!segment.tagged);
 #endif
 		}
@@ -565,15 +499,17 @@ struct VirtualMemory
 		hasCachedWrite = false;
 	}
 
-	void iterateTranslatedSegments(Address from, size_t length, function<void(const Address&, const size_t, bool)> lambda) const
+	void iterateTranslatedSegments(Address from, size_t length, function<void(const Address&, const size_t)> lambda) const
 	{
 		translationTable.translateSegment(from, length, lambda);
 	}
 
-	void loadTaggedToTMP(const DetailedBlock & dataToLoad, SchedulerData & commands, bool noTranslation = false);
+	void loadTaggedToTMP(const DetailedBlock & dataToLoad, SchedulerData & commands);
 
 private:
-	void _loadTaggedToTMP(const DetailedBlock & dataToLoad, SchedulerData & commands, bool noTranslation);
+	void _sortBySortedAddress(const DetailedBlock & dataToLoad, vector<DetailedBlockMetadata> & output);
+	void _retagReusedToken(vector<DetailedBlockMetadata> & sortedTokenWithTranslation);
+	void _loadTaggedToTMP(const DetailedBlock & dataToLoad, SchedulerData & commands);
 };
 
 
