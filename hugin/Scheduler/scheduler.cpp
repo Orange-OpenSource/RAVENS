@@ -162,6 +162,8 @@ bool generatePatch(const uint8_t *original, size_t originalLength, const uint8_t
 	if(outputPatch.bsdiff.empty())
 		return false;
 
+	outputPatch.compactBSDiff();
+
 	//Generate the commands to run
 	{
 #ifdef PRINT_SPEED

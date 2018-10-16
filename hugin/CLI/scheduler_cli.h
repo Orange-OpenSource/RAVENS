@@ -35,7 +35,7 @@ void printAuthenticationHelp();
 bool processAuthentication(int argc, char *argv[]);
 
 #ifdef HERMES_PUBLIC_COMMAND_H
-	bool runSchedulerWithFiles(const char * oldFile, const char * newFile, const char * output, std::vector<VerificationRange> & preUpdateHashes, bool printLog);
+	bool runSchedulerWithFiles(const char * oldFile, const char * newFile, const char * output, std::vector<VerificationRange> & preUpdateHashes, bool printLog, bool dryRun);
 	bool processSchedulerBatch(const char * configFile, char * outputDir);
 	bool parseConfig(const char * configFile, bool wantManifests, std::vector<VersionData> & output, size_t & flashSize, size_t & flashPageSize);
 #endif

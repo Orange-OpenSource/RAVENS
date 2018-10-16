@@ -1,6 +1,9 @@
-# Hugin [![Build Status](https://travis-ci.org/Orange-OpenSource/RAVENS.svg?branch=master)](https://travis-ci.org/Orange-OpenSource/RAVENS)
+# RAVENS [![Build Status](https://travis-ci.org/Orange-OpenSource/RAVENS.svg?branch=master)](https://travis-ci.org/Orange-OpenSource/RAVENS)
 
-Hugin is a command line util able to generate small delta software updates, easy to install in-place on constrained devices. Hugin can then be used to authenticate the update package, can distribute it to devices. Munin offer a reference implementation of the code necessary on the device to install the update package, in place, in a resilient manner.
+RAVENS, which stands for Resilient Architecture for Very Efficient firmware updates of Network-connected Systems is a software ecosystem built on top of two main components.
+
+- Hugin is a command line tool able to generate small delta software updates, easy to install in-place on constrained devices. Hugin can then also be used to authenticate the update package, and has an extension to distribute those updates to devices over the Internet.
+- Munin offer a reference implementation of the code necessary on the device to install the update package, in place, in a resilient manner.
 
 Properly used, Hugin and Munin enable secure and efficient firmware updates of very small IoT devices.
 
@@ -11,6 +14,15 @@ Properly used, Hugin and Munin enable secure and efficient firmware updates of v
 - Run cmake to create Makefiles: `cmake .`
 - Make: `make Hugin`
 - Hugin is now built in `hugin/`
+
+## Munin
+
+Munin is usually tailored for a specific device configuration. Some targets may have ready-made compilation scripts, but if not currently supported, you'll have to do the port.
+
+### mbedOS
+
+The script to compile the mbedOS version of Munin is available in `munin/integration/mbedOS/make_mbed.sh`. The script is supposed to be ran from the root of the project, as it'll pick files from the `munin/` directory, but also `common/`.  
+**The script will delete the `tmp` directory**, create it anew and use it to lay the files necessary to the build.
 
 # How to use
 
@@ -27,7 +39,7 @@ Hugin can generate update packages through two ways.
 This step require access to the device master key. This cryptographic key is EXTREMELY powerful and thus should be stored on a secure computer, hopefully an HSM. At the very least, it is strongly recommended to perform the signing on a dedicated, air-gapped server.
 Assuming this is the case, this is done, the following command will make Hugin sign the various update packages: `path/to/Hugin authenticate -p path/to/update/directory/ -o path/to/signed/output/directory/ -k path/to/priv.key`
 
-## Import an update to the serveur
+## Import an update to the server
 
 A small Python server implement Munin's protocol and provide various security guarantees.
 Importing the updates to the server is done with the following command: `python3 hugin/webserver/zeus.py import -d <Device Name> -i path/to/signed/output/directory/ -o /path/to/server/update/storage/`

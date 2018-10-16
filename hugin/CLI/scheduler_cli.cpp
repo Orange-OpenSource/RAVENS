@@ -37,6 +37,7 @@ void printSchedulerHelp()
 
 	cout << "Optional arguments:" << endl <<
 "	--verbose		- Print additional information on the patch generation" << endl <<
+"	--dryRun		- Perform the diff but doesn't actually write down the update. Useful for testing. Not valid in batchMode" << endl <<
 "	--flashSize value	- Determine the address space. Value should be the power of two to be used." << endl <<
 "				(e.g. 20 means that the flash is 2^20 bytes = 1MiB)" << endl <<
 "				Default value is 20 (i.e. 1MiB)" << endl <<
@@ -46,9 +47,9 @@ void printSchedulerHelp()
 "	--diffAndSign" << endl << endl;
 }
 
-bool runSchedulerWithFiles(const char * oldFile, const char * newFile, const char * output, vector<VerificationRange> & preUpdateHashes, bool printLog)
+bool runSchedulerWithFiles(const char * oldFile, const char * newFile, const char * output, vector<VerificationRange> & preUpdateHashes, bool printLog, bool dryRun)
 {
-	if(oldFile == nullptr || newFile == nullptr || output == nullptr)
+	if(oldFile == nullptr || newFile == nullptr || (output == nullptr && !dryRun))
 	{
 		printSchedulerHelp();
 		return false;
@@ -97,6 +98,7 @@ bool runSchedulerWithFiles(const char * oldFile, const char * newFile, const cha
 	}
 
 	//Restrict outputFile's scope
+	if(!dryRun)
 	{
 		FILE * outputFile = fopen(output, "wb");
 		retValue = outputFile != nullptr && writeBSDiff(patch, outputFile);
@@ -169,7 +171,7 @@ bool processScheduler(int argc, char *argv[])
 	else
 	{
 		const char * oldFile = nullptr, * newFile = nullptr;
-		bool wantLog = false;
+		bool wantLog = false, dryRun = false;
 		while(index < argc)
 		{
 			if((!strcmp(argv[index], "--original") || !strcmp(argv[index], "-v1")) && index + 1 < argc)
@@ -186,6 +188,11 @@ bool processScheduler(int argc, char *argv[])
 			{
 				output = argv[index + 1];
 				index += 2;
+			}
+			else if(!strcmp(argv[index], "--dryRun"))
+			{
+				dryRun = true;
+				index += 1;
 			}
 			else if(!strcmp(argv[index], "--verbose"))
 			{
@@ -221,9 +228,12 @@ bool processScheduler(int argc, char *argv[])
 
 		vector<VerificationRange> preUpdateHashes;
 
-		if(!runSchedulerWithFiles(oldFile, newFile, output, preUpdateHashes, wantLog))
+		if(!runSchedulerWithFiles(oldFile, newFile, output, preUpdateHashes, wantLog, dryRun))
 			return false;
 
+		if(dryRun)
+			return true;
+		
 		return writeVerifRangeToFile(preUpdateHashes, string(output) + ".hashes");
 	}
 }

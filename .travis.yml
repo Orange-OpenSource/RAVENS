@@ -34,3 +34,6 @@ script:
   - make -j2 Hugin
   - cd test_files
   - ../hugin/Hugin test
+  - tar xzf test3_v1.tar.gz 
+  - tar xzf test3_v2.tar.gz
+  - ../hugin/Hugin diff -v1 test3_v1 -v2 test3_v2 --dryRun --flashSize 30
