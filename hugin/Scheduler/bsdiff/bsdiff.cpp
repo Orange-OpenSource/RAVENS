@@ -310,12 +310,12 @@ bool writeBSDiff(const SchedulerPatch & patch, void * output)
 	if(uncompressedBuffer == nullptr)
 		return false;
 
-	assert(patch.bsdiff.size() < UINT16_MAX);
+	assert(patch.bsdiff.size() < UINT32_MAX);
 
 	//Copy the number of segments
-	*((uint16_t*) uncompressedBuffer) = static_cast<uint16_t>(patch.bsdiff.size());
+	*((uint32_t*) uncompressedBuffer) = static_cast<uint32_t>(patch.bsdiff.size());
 
-	size_t index = sizeof(uint16_t);
+	size_t index = sizeof(uint32_t);
 	for(const auto & command : patch.bsdiff)
 	{
 		offtout(static_cast<uint32_t>(command.delta.length), &uncompressedBuffer[index]);

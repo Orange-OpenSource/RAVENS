@@ -251,7 +251,7 @@ HERMES_CRITICAL bool applyDeltaPatch(const UpdateHeader * header, size_t current
 	 * Because alignment will be all over the place, casting will be used liberally
 	 */
 
-	const uint16_t numberSegments = consumeWord(&context);
+	const uint32_t numberSegments = consumeDWord(&context);
 	uint32_t currentSubsegmentLength = consumeDWord(&context);
 
 	while(currentSegment < numberSegments && !context.isOutOfData)
