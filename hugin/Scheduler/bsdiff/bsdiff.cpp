@@ -172,7 +172,7 @@ void bsdiff(const uint8_t * old, size_t oldSize, const uint8_t * newer, size_t n
 
 			const size_t currentExtraBufferLength = (scan - deltaLengthBackward) - (lastScan + deltaLengthForward);
 
-			uint8_t *deltaBuffer = nullptr, *extraBuffer = nullptr;
+			uint8_t *deltaBuffer = nullptr;
 
 			//Delta computation
 			if(deltaLengthForward)
@@ -187,18 +187,8 @@ void bsdiff(const uint8_t * old, size_t oldSize, const uint8_t * newer, size_t n
 					deltaBuffer[i] = newer[lastScan + i] - old[lastPos + i];
 			}
 
-			//Copy of the extra data
-			if(currentExtraBufferLength)
-			{
-				extraBuffer = (uint8_t *) malloc(currentExtraBufferLength);
-				if (deltaBuffer == nullptr)
-					errx(1, "Memory error allocatating extra buffer of size (%li)", currentExtraBufferLength);
-
-				memcpy(extraBuffer, &newer[lastScan + deltaLengthForward], currentExtraBufferLength);
-			}
-
 			if(deltaLengthForward || currentExtraBufferLength)
-				patch.emplace_back(BSDiffPatch(lastPos, deltaLengthForward, deltaBuffer, currentExtraBufferLength, extraBuffer));
+				patch.emplace_back(BSDiffPatch(lastPos, deltaLengthForward, deltaBuffer, currentExtraBufferLength, lastScan + deltaLengthForward));
 
 			lastScan = scan - deltaLengthBackward;
 			lastPos = matchPos - deltaLengthBackward;

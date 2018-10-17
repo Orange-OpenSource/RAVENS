@@ -138,6 +138,15 @@ bool generatePatch(const uint8_t *original, size_t originalLength, const uint8_t
 
 		moves.emplace_back(BSDiffMoves(cur.oldDataAddress, cur.lengthDelta, currentAddress));
 		currentAddress += cur.lengthDelta + cur.lengthExtra;
+		
+		uint8_t * extraData = nullptr;
+		if(cur.lengthExtra)
+		{
+			extraData = (uint8_t *) malloc(cur.lengthExtra);
+			assert(extraData != nullptr);
+			assert(cur.extraPos + cur.lengthExtra <= newLength);
+			memcpy(extraData, &newer[cur.extraPos], cur.lengthExtra);
+		}
 
 		outputPatch.bsdiff.push_back(BSDiff {
 				.delta = {
@@ -146,7 +155,7 @@ bool generatePatch(const uint8_t *original, size_t originalLength, const uint8_t
 				},
 
 				.extra = {
-						.data = cur.extraData,
+						.data = extraData,
 						.length = cur.lengthExtra
 				}
 		});

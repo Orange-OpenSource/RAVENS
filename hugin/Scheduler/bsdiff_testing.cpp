@@ -55,7 +55,7 @@ bool validateBSDiff(const uint8_t * original, size_t originalLength, const uint8
 		}
 
 		for(size_t i = 0; i < cur.lengthExtra; ++i)
-			virtualFlash[currentOffset++] = cur.extraData[i];
+			virtualFlash[currentOffset++] = newer[cur.extraPos + i];
 
 		assert(currentOffset <= flashLength);
 	}
