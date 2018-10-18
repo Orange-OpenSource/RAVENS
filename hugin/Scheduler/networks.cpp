@@ -582,6 +582,13 @@ void Network::performToken(NetworkNode & source, NetworkNode & destination, Sche
 	size_t destLength = newDest.getOccupationLevel();
 	size_t lengthToAllocateLeft = fakeCommonNode.getOccupationLevel();
 
+	//If we have a significant fragmentation between source and destination, we may have a problem
+	if(sourceLength + destLength + lengthToAllocateLeft > 2 * BLOCK_SIZE)
+	{
+		newSource.removeOverlapWithToken(newDest.tokens);
+		sourceLength = newSource.getOccupationLevel();
+	}
+
 	//We can finish source AND destination, and still store the data that is necessary elsewhere
 	if(source.lengthFinalLayout + destination.lengthFinalLayout + lengthToAllocateLeft <= 2 * BLOCK_SIZE)
 	{
