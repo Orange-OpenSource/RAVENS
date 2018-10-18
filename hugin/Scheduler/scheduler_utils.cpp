@@ -233,7 +233,7 @@ size_t NetworkToken::removeOverlapWith(const vector<NetworkToken> & networkToken
 	assert(sumLength <= length);
 
 	const size_t change = length - sumLength;
-	if(change)
+	if(change || sourceToken.size() != newSourceToken.size())
 	{
 		sourceToken = newSourceToken;
 		length = sumLength;
