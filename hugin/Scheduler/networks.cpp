@@ -848,8 +848,14 @@ void Network::sourcesForFinal(const NetworkNode & node, vector<BlockID> & source
 		sources.reserve(sources.size() + sourcesCollector.size());
 		for(const BlockID & block : sourcesCollector)
 		{
-			if(block != node.block)
-				sources.emplace_back(block);
+			if(block == node.block)
+				continue;
+			
+			//If we have a pending write, some data from the other block may be moved to the one not yet written
+			if(memoryLayout.hasCachedWrite && block == memoryLayout.cachedOtherPartyBlock)
+				sources.emplace_back(memoryLayout.cachedWriteBlock);
+			
+			sources.emplace_back(block);
 		}
 
 		sort(sources.begin(), sources.end(), [](const BlockID & a, const BlockID & b) { return a.value < b.value; });
