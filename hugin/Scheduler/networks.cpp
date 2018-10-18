@@ -499,29 +499,6 @@ NetworkToken Network::findLargestToken()
 	return outputToken;
 }
 
-enum DataSource {
-	SOURCE_ORIGIN = 1,
-	DESTINATION_ORIGIN,
-	COMMON_ORIGIN
-};
-
-void determineBlockDataLocation(const NetworkNode & source, const NetworkNode & destination, unordered_map<BlockID, DataSource> & location)
-{
-	location.reserve(source.tokens.size() + destination.tokens.size());
-
-	for(const auto & data : source.tokens)
-		location.emplace(data.destinationBlockID, SOURCE_ORIGIN);
-
-	for(const auto & data : destination.tokens)
-	{
-		auto &match = location[data.destinationBlockID];
-		if(match == SOURCE_ORIGIN)
-			match = COMMON_ORIGIN;
-		else
-			match = DESTINATION_ORIGIN;
-	}
-}
-
 void Network::performToken(NetworkNode & source, NetworkNode & destination, SchedulerData & schedulerData)
 {
 	NetworkNode fakeCommonNode = source;
@@ -678,12 +655,6 @@ void Network::performToken(NetworkNode & source, NetworkNode & destination, Sche
 
 	fakeCommonNode.dispatchInNodes(newSource, newDest);
 	Scheduler::networkSwapCodeGeneration(newSource, newDest, memoryLayout, schedulerData);
-
-	// We need to determine who lost and who won. The details don't really matter
-	//First, we make an inventory before and after
-	unordered_map<BlockID, DataSource> dataOrigin, dataFinal;
-	determineBlockDataLocation(source, destination, dataOrigin);
-	determineBlockDataLocation(newSource, newDest, dataFinal);
 
 	//Before updating the tokens, we signal potential final moves
 	if(newSource.isFinal)	pulledEverythingForNode(source, sourceSources);

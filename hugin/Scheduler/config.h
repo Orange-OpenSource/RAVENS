@@ -57,7 +57,7 @@
 
 #define PRINT_SPEED
 
-//Significant performance penalty
+//Significant performance penalty, ≈ 10% on conflict resolution and the generation of conflict ranges
 #define VERY_AGGRESSIVE_ASSERT
 
 //Encoder related config
