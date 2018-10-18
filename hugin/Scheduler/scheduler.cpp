@@ -44,8 +44,9 @@ void schedule(const vector<BSDiffMoves> & input, vector<PublicCommand> & output,
 #include "bsdiff/bsdiff.h"
 #include "validation.h"
 
-void trimBSDiff(vector<BSDiffPatch> &patch)
+size_t trimBSDiff(vector<BSDiffPatch> &patch)
 {
+	size_t lengthTrimmed = 0;
 	BSDiffPatch & lastPatch = patch.back();
 	if(lastPatch.lengthExtra == 0)
 	{
@@ -55,8 +56,10 @@ void trimBSDiff(vector<BSDiffPatch> &patch)
 		//Extra padding present, we can trim it!
 		if(trim != lastPatch.lengthDelta - 1)
 		{
+			lengthTrimmed = lastPatch.lengthDelta - trim - 1;
+			
 			//We may trim, but some data are still left
-			if(trim != 0)
+			if(trim != 0 || lastPatch.deltaData[0] != 0)
 				lastPatch.lengthDelta = trim + 1;
 
 				//No data left, the last patch is pointless
@@ -64,6 +67,7 @@ void trimBSDiff(vector<BSDiffPatch> &patch)
 				patch.pop_back();
 		}
 	}
+	return lengthTrimmed;
 }
 
 bool generatePatch(const uint8_t *original, size_t originalLength, const uint8_t *newer, size_t newLength, SchedulerPatch &outputPatch, bool printStats)
@@ -108,7 +112,7 @@ bool generatePatch(const uint8_t *original, size_t originalLength, const uint8_t
 		return false;
 
 	//If we don't have extra at the end, we may be able to trim the delta.
-	trimBSDiff(patch);
+	size_t lengthTrimmed = trimBSDiff(patch);
 
 	if(printStats)
 	{
@@ -161,11 +165,14 @@ bool generatePatch(const uint8_t *original, size_t originalLength, const uint8_t
 		});
 	}
 
+	assert(newLength - currentAddress == lengthTrimmed);
+
 	//Extend the last copy if we had to trim it so that the end of the last block is copied
-	if(currentAddress < newLength)
+	if(lengthTrimmed)
 	{
 		assert(!moves.empty());
-		moves.back().length += MIN(newLength - currentAddress, BLOCK_SIZE - (currentAddress & BLOCK_OFFSET_MASK));
+		assert(moves.back().start + moves.back().length + lengthTrimmed <= originalLength);
+		moves.back().length += lengthTrimmed;
 	}
 
 	if(outputPatch.bsdiff.empty())
