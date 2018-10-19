@@ -592,20 +592,20 @@ void Network::performToken(NetworkNode & source, NetworkNode & destination, Sche
 	//We can finish source AND destination, and still store the data that is necessary elsewhere
 	if(source.lengthFinalLayout + destination.lengthFinalLayout + lengthToAllocateLeft <= 2 * BLOCK_SIZE)
 	{
-		newSource.setFinal(source.lengthFinalLayout, memoryLayout);
-		newDest.setFinal(destination.lengthFinalLayout, memoryLayout);
+		newSource.setFinal(source.lengthFinalLayout, newDest.block, memoryLayout);
+		newDest.setFinal(destination.lengthFinalLayout, newSource.block, memoryLayout);
 	}
 
 	//We can finish destination
 	else if(sourceLength + destination.lengthFinalLayout + lengthToAllocateLeft <= 2 * BLOCK_SIZE)
 	{
-		newDest.setFinal(destination.lengthFinalLayout, memoryLayout);
+		newDest.setFinal(destination.lengthFinalLayout, newSource.block, memoryLayout);
 	}
 
 	//We can finish source
 	else if(source.lengthFinalLayout + destLength + lengthToAllocateLeft <= 2 * BLOCK_SIZE)
 	{
-		newSource.setFinal(source.lengthFinalLayout, memoryLayout);
+		newSource.setFinal(source.lengthFinalLayout, newDest.block, memoryLayout);
 	}
 
 	//If one of the node have turned final, we remove incomming data from any other potential token
