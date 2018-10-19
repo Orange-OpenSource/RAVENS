@@ -49,6 +49,7 @@ bool validateBSDiff(const uint8_t * original, size_t originalLength, const uint8
 #endif
 		if(cur.lengthDelta)
 		{
+			assert(cur.oldDataAddress + cur.lengthDelta <= originalLength);
 			memcpy(&virtualFlash[currentOffset], &original[cur.oldDataAddress], cur.lengthDelta);
 			for(size_t i = 0; i < cur.lengthDelta; ++i)
 				virtualFlash[currentOffset++] += cur.deltaData[i];

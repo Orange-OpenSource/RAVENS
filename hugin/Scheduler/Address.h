@@ -24,6 +24,7 @@ public:
 	BlockID(size_t newValue) : value(newValue & BLOCK_MASK) {}
 
 	BlockID operator+(const size_t & a) const	{	return value + (a << BLOCK_SIZE_BIT);	}
+	void operator+=(size_t b)					{	value += b << BLOCK_SIZE_BIT; }
 	bool operator==(const BlockID & b) const	{	return value == b.value;	}
 	bool operator!=(const BlockID & b) const	{	return value != b.value;	}
 	bool operator>=(const BlockID & b) const	{	return value >= b.value;	}
