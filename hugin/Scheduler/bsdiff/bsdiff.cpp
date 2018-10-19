@@ -283,7 +283,7 @@ bool writeBSDiff(const SchedulerPatch & patch, void * output)
 	if(fwrite(&patch.startAddress, 1, sizeof(uint32_t), (FILE*) output) != sizeof(uint32_t))
 		return false;
 
-	size_t fullUncompressedLength = 2 * sizeof(uint16_t);	//Number of BSDiff segments and number of validation ranges
+	size_t fullUncompressedLength = sizeof(uint32_t) + sizeof(uint16_t);	//Number of BSDiff segments and number of validation ranges
 
 	for(const auto & command : patch.bsdiff)
 	{

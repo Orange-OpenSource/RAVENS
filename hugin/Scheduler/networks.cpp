@@ -860,15 +860,19 @@ void Network::pulledEverythingForNode(NetworkNode & node, const vector<BlockID> 
 		{
 			do {
 				nextSource += 1;
-			} while(networkNode.block > *nextSource);
+			} while(nextSource != nodeSources.cend() && networkNode.block > *nextSource);
+			
+			if(nextSource == nodeSources.cend())
+				break;
 
-			if(networkNode.block < *nextSource)
+			if(networkNode.block != *nextSource)
 				continue;
 		}
 
 		if(networkNode.isFinal)
 		{
-			nextSource += 1;
+			if(++nextSource == nodeSources.cend())
+				break;
 			continue;
 		}
 
@@ -1090,8 +1094,7 @@ void Network::pulledEverythingForNode(NetworkNode & node, const vector<BlockID> 
 		}
 #endif
 
-		nextSource += 1;
-		if(nextSource == nodeSources.cend())
+		if(++nextSource == nodeSources.cend())
 			break;
 	}
 }
