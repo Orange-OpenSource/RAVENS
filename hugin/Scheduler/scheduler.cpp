@@ -233,7 +233,8 @@ bool stripDeltaBelowThreshold(vector<BSDiffPatch> &patch, size_t & earlySkip, co
 		Address testAddress(earlySkip);
 		for(const auto & iter : patch)
 		{
-			assert(testAddress.value + iter.lengthDelta == iter.extraPos);
+			if(iter.lengthExtra != 0)
+				assert(testAddress.value + iter.lengthDelta == iter.extraPos);
 			testAddress += iter.lengthDelta + iter.lengthExtra;
 		}
 	}
@@ -259,7 +260,6 @@ bool generatePatch(const uint8_t *original, size_t originalLength, const uint8_t
 	vector<BSDiffPatch> patch;
 
 	//Generate the diff
-	//TODO: Ignore delta for less than a couple of bytes, too wasteful in COPY encoding
 	//TODO: Introduce a skip field, to go over vast untouched area faster
 	{
 #ifdef PRINT_SPEED
