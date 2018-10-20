@@ -50,7 +50,7 @@
 			{
 				"flag" : "0x5ec1714e",
 				"initialOffset" : "4B integer indicating the number of pages at the beginning of the flash to ignore when applying the delta. Doesn't affect the execution of commands",
-				"nbBinDiff" : "2B",
+				"nbBinDiff" : "4B",
 				"bindiff" :
 				[
 					{
