@@ -268,12 +268,12 @@ struct VirtualMemory
 
 	bool hasCachedWrite;
 	bool cachedWriteIgnoreLayout;
-	BlockID cachedWriteBlock;
+	BlockID cachedWriteBlock, cachedOtherPartyBlock;
 	DetailedBlock cachedWriteRequest;
 
-	VirtualMemory(const vector<Block> &blocks) : translationTable(blocks), cacheLayout(), hasCachedWrite(false), cachedWriteBlock(CACHE_BUF), cachedWriteRequest() {}
+	VirtualMemory(const vector<Block> &blocks) : translationTable(blocks), cacheLayout(), hasCachedWrite(false), cachedWriteBlock(CACHE_BUF), cachedOtherPartyBlock(CACHE_BUF), cachedWriteRequest() {}
 
-	VirtualMemory(const vector<Block> &blocks, const vector<size_t> &indexes) : translationTable(blocks, indexes), cacheLayout(), hasCachedWrite(false), cachedWriteBlock(CACHE_BUF), cachedWriteRequest() {}
+	VirtualMemory(const vector<Block> &blocks, const vector<size_t> &indexes) : translationTable(blocks, indexes), cacheLayout(), hasCachedWrite(false), cachedWriteBlock(CACHE_BUF), cachedOtherPartyBlock(CACHE_BUF), cachedWriteRequest() {}
 
 	void translateSegment(Address from, size_t length, vector<DetailedBlockMetadata> & output) const
 	{
@@ -461,13 +461,14 @@ struct VirtualMemory
 		commands.finishTransaction();
 	}
 
-	void cacheWrite(const BlockID block, const DetailedBlock & writes, bool ignoreLayout, SchedulerData &commands)
+	void cacheWrite(const BlockID block, const DetailedBlock & writes, const BlockID otherBlock, bool ignoreLayout, SchedulerData &commands)
 	{
 		if(hasCachedWrite)
 			commitCachedWrite(commands);
 
 		cachedWriteIgnoreLayout = ignoreLayout;
 		cachedWriteBlock = block;
+		cachedOtherPartyBlock = otherBlock;
 		cachedWriteRequest = writes;
 		hasCachedWrite = true;
 #ifndef AVOID_UNECESSARY_REWRITE
@@ -475,7 +476,7 @@ struct VirtualMemory
 #endif
 	}
 	
-	void flushCacheToBlock(const BlockID block, bool shouldCacheWrite, SchedulerData &commands)
+	void flushCacheToBlock(const BlockID block, const BlockID otherParty, bool shouldCacheWrite, SchedulerData &commands)
 	{
 		DetailedBlock writes(block);
 		Address outputAddress(block, 0);
@@ -491,7 +492,7 @@ struct VirtualMemory
 		assert(outputAddress.value - block.value <= BLOCK_SIZE);
 
 		if(shouldCacheWrite)
-			cacheWrite(block, writes, true, commands);
+			cacheWrite(block, writes, otherParty, true, commands);
 		else
 			writeTaggedToBlock(block, writes, commands);
 	}

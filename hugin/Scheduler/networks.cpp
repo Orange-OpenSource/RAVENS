@@ -499,29 +499,6 @@ NetworkToken Network::findLargestToken()
 	return outputToken;
 }
 
-enum DataSource {
-	SOURCE_ORIGIN = 1,
-	DESTINATION_ORIGIN,
-	COMMON_ORIGIN
-};
-
-void determineBlockDataLocation(const NetworkNode & source, const NetworkNode & destination, unordered_map<BlockID, DataSource> & location)
-{
-	location.reserve(source.tokens.size() + destination.tokens.size());
-
-	for(const auto & data : source.tokens)
-		location.emplace(data.destinationBlockID, SOURCE_ORIGIN);
-
-	for(const auto & data : destination.tokens)
-	{
-		auto &match = location[data.destinationBlockID];
-		if(match == SOURCE_ORIGIN)
-			match = COMMON_ORIGIN;
-		else
-			match = DESTINATION_ORIGIN;
-	}
-}
-
 void Network::performToken(NetworkNode & source, NetworkNode & destination, SchedulerData & schedulerData)
 {
 	NetworkNode fakeCommonNode = source;
@@ -605,23 +582,30 @@ void Network::performToken(NetworkNode & source, NetworkNode & destination, Sche
 	size_t destLength = newDest.getOccupationLevel();
 	size_t lengthToAllocateLeft = fakeCommonNode.getOccupationLevel();
 
+	//If we have a significant fragmentation between source and destination, we may have a problem
+	if(sourceLength + destLength + lengthToAllocateLeft > 2 * BLOCK_SIZE)
+	{
+		newSource.removeOverlapWithToken(newDest.tokens);
+		sourceLength = newSource.getOccupationLevel();
+	}
+
 	//We can finish source AND destination, and still store the data that is necessary elsewhere
 	if(source.lengthFinalLayout + destination.lengthFinalLayout + lengthToAllocateLeft <= 2 * BLOCK_SIZE)
 	{
-		newSource.setFinal(source.lengthFinalLayout, memoryLayout);
-		newDest.setFinal(destination.lengthFinalLayout, memoryLayout);
+		newSource.setFinal(source.lengthFinalLayout, newDest.block, memoryLayout);
+		newDest.setFinal(destination.lengthFinalLayout, newSource.block, memoryLayout);
 	}
 
 	//We can finish destination
 	else if(sourceLength + destination.lengthFinalLayout + lengthToAllocateLeft <= 2 * BLOCK_SIZE)
 	{
-		newDest.setFinal(destination.lengthFinalLayout, memoryLayout);
+		newDest.setFinal(destination.lengthFinalLayout, newSource.block, memoryLayout);
 	}
 
 	//We can finish source
 	else if(source.lengthFinalLayout + destLength + lengthToAllocateLeft <= 2 * BLOCK_SIZE)
 	{
-		newSource.setFinal(source.lengthFinalLayout, memoryLayout);
+		newSource.setFinal(source.lengthFinalLayout, newDest.block, memoryLayout);
 	}
 
 	//If one of the node have turned final, we remove incomming data from any other potential token
@@ -678,12 +662,6 @@ void Network::performToken(NetworkNode & source, NetworkNode & destination, Sche
 
 	fakeCommonNode.dispatchInNodes(newSource, newDest);
 	Scheduler::networkSwapCodeGeneration(newSource, newDest, memoryLayout, schedulerData);
-
-	// We need to determine who lost and who won. The details don't really matter
-	//First, we make an inventory before and after
-	unordered_map<BlockID, DataSource> dataOrigin, dataFinal;
-	determineBlockDataLocation(source, destination, dataOrigin);
-	determineBlockDataLocation(newSource, newDest, dataFinal);
 
 	//Before updating the tokens, we signal potential final moves
 	if(newSource.isFinal)	pulledEverythingForNode(source, sourceSources);
@@ -848,8 +826,14 @@ void Network::sourcesForFinal(const NetworkNode & node, vector<BlockID> & source
 		sources.reserve(sources.size() + sourcesCollector.size());
 		for(const BlockID & block : sourcesCollector)
 		{
-			if(block != node.block)
-				sources.emplace_back(block);
+			if(block == node.block)
+				continue;
+			
+			//If we have a pending write, some data from the other block may be moved to the one not yet written
+			if(memoryLayout.hasCachedWrite && block == memoryLayout.cachedOtherPartyBlock)
+				sources.emplace_back(memoryLayout.cachedWriteBlock);
+			
+			sources.emplace_back(block);
 		}
 
 		sort(sources.begin(), sources.end(), [](const BlockID & a, const BlockID & b) { return a.value < b.value; });
@@ -876,15 +860,19 @@ void Network::pulledEverythingForNode(NetworkNode & node, const vector<BlockID> 
 		{
 			do {
 				nextSource += 1;
-			} while(networkNode.block > *nextSource);
+			} while(nextSource != nodeSources.cend() && networkNode.block > *nextSource);
+			
+			if(nextSource == nodeSources.cend())
+				break;
 
-			if(networkNode.block < *nextSource)
+			if(networkNode.block != *nextSource)
 				continue;
 		}
 
 		if(networkNode.isFinal)
 		{
-			nextSource += 1;
+			if(++nextSource == nodeSources.cend())
+				break;
 			continue;
 		}
 
@@ -1106,8 +1094,7 @@ void Network::pulledEverythingForNode(NetworkNode & node, const vector<BlockID> 
 		}
 #endif
 
-		nextSource += 1;
-		if(nextSource == nodeSources.cend())
+		if(++nextSource == nodeSources.cend())
 			break;
 	}
 }

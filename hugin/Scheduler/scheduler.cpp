@@ -44,8 +44,9 @@ void schedule(const vector<BSDiffMoves> & input, vector<PublicCommand> & output,
 #include "bsdiff/bsdiff.h"
 #include "validation.h"
 
-void trimBSDiff(vector<BSDiffPatch> &patch)
+size_t trimBSDiff(vector<BSDiffPatch> &patch)
 {
+	size_t lengthTrimmed = 0;
 	BSDiffPatch & lastPatch = patch.back();
 	if(lastPatch.lengthExtra == 0)
 	{
@@ -55,8 +56,10 @@ void trimBSDiff(vector<BSDiffPatch> &patch)
 		//Extra padding present, we can trim it!
 		if(trim != lastPatch.lengthDelta - 1)
 		{
+			lengthTrimmed = lastPatch.lengthDelta - trim - 1;
+			
 			//We may trim, but some data are still left
-			if(trim != 0)
+			if(trim != 0 || lastPatch.deltaData[0] != 0)
 				lastPatch.lengthDelta = trim + 1;
 
 				//No data left, the last patch is pointless
@@ -64,6 +67,180 @@ void trimBSDiff(vector<BSDiffPatch> &patch)
 				patch.pop_back();
 		}
 	}
+	return lengthTrimmed;
+}
+
+bool stripDeltaBelowThreshold(vector<BSDiffPatch> &patch, size_t & earlySkip, const uint32_t threshold)
+{
+	BlockID currentPage(earlySkip);
+	Address baseAddressIter(earlySkip);
+	
+#ifdef PRINT_BSDIFF_SECTIONS_STATUS
+	cout << "[DEBUG] BSDiff status: Starting address: 0x" << hex << baseAddressIter.value << dec << endl;
+#endif
+	
+	size_t amountOfDeltaInPage = 0;
+	bool deletedSomething = false;
+	
+	//We look for how much delta there is in any page
+	for(auto iter = patch.begin(); iter != patch.end(); )
+	{
+		assert(baseAddressIter == currentPage);
+		
+		if(baseAddressIter + iter->lengthDelta + iter->lengthExtra == currentPage)
+		{
+			amountOfDeltaInPage += iter->lengthDelta;
+			baseAddressIter += iter->lengthDelta + iter->lengthExtra;
+
+			if(iter->lengthExtra == 0)
+				iter->extraPos = baseAddressIter.value;
+			else
+				assert(baseAddressIter.value == iter->extraPos + iter->lengthExtra);
+
+			iter += 1;
+			continue;
+		}
+		//Okay, we're leaving the page
+		const size_t lengthLeftInPage = BLOCK_SIZE - baseAddressIter.getOffset();
+		const size_t sectionOfDeltaFallingInPrevPage = MIN(iter->lengthDelta, lengthLeftInPage);
+		const size_t sectionOfDeltaFallingInNextPage = (iter->lengthDelta - sectionOfDeltaFallingInPrevPage) % BLOCK_SIZE;
+		const size_t originalTokenSize = iter->lengthDelta + iter->lengthExtra;
+		const size_t numberOfPagesToSkip = (originalTokenSize - lengthLeftInPage) / BLOCK_SIZE;
+		
+		amountOfDeltaInPage += sectionOfDeltaFallingInPrevPage;
+		
+		assert(amountOfDeltaInPage <= BLOCK_SIZE);
+#ifdef PRINT_BSDIFF_SECTIONS_STATUS
+		cout << "[DEBUG] BSDiff status: Page 0x" << hex << currentPage.value << " contains a total of 0x" << amountOfDeltaInPage << " bytes of delta (threshold is 0x" << threshold << ")." << dec << endl;
+#endif
+		
+		//Do we have enough delta? If not, we need to delete the delta from the last page
+		if(amountOfDeltaInPage < threshold)
+		{
+			//Soooo... We will need to convert any delta from the page to extra :|
+			deletedSomething = true;
+			
+			//We trim the last page
+			if(sectionOfDeltaFallingInPrevPage)
+			{
+				//Can we remove the full delta section?
+				if(sectionOfDeltaFallingInPrevPage == iter->lengthDelta)
+				{
+					free(iter->deltaData);
+					iter->deltaData = nullptr;
+					iter->lengthDelta = 0;
+					iter->lengthExtra += sectionOfDeltaFallingInPrevPage;
+					iter->extraPos -= sectionOfDeltaFallingInPrevPage;
+				}
+				else
+				{
+					//Are we at the beginning?
+					if(iter == patch.begin())
+					{
+						assert(sectionOfDeltaFallingInPrevPage == BLOCK_SIZE);
+						earlySkip += BLOCK_SIZE;
+					}
+					else
+					{
+						(iter - 1)->lengthExtra += sectionOfDeltaFallingInPrevPage;
+					}
+
+					//We need to move the delta data to a smaller buffer
+					iter->oldDataAddress += sectionOfDeltaFallingInPrevPage;
+					iter->lengthDelta -= sectionOfDeltaFallingInPrevPage;
+					memmove(iter->deltaData, &iter->deltaData[sectionOfDeltaFallingInPrevPage], iter->lengthDelta);
+					
+					uint8_t * buffer = (uint8_t *) realloc(iter->deltaData, iter->lengthDelta);
+					assert(buffer);
+					iter->deltaData = buffer;
+				}
+			}
+			
+			//Go back in the array and shrink delta while we're still in the same page
+			size_t currentPosInBuffer = baseAddressIter.getOffset();
+			auto iterCopy = iter;
+			while(currentPosInBuffer)
+			{
+				assert(iterCopy != patch.begin());
+				iterCopy -= 1;
+
+				//Our starting point is in the extra section
+				if(currentPosInBuffer <= iterCopy->lengthExtra)
+					break;
+
+				currentPosInBuffer -= iterCopy->lengthExtra;
+
+				//Do we need to fully wipe the current delta segment?
+				if(currentPosInBuffer >= iterCopy->lengthDelta)
+				{
+					currentPosInBuffer -= iterCopy->lengthDelta;
+					iterCopy->extraPos -= iterCopy->lengthDelta;
+					iterCopy->lengthExtra += iterCopy->lengthDelta;
+					
+					free(iterCopy->deltaData);
+					iterCopy->deltaData = nullptr;
+					iterCopy->lengthDelta = 0;
+
+				}
+				//Nah, we're almost good
+				else
+				{
+					iterCopy->lengthDelta -= currentPosInBuffer;
+					iterCopy->extraPos -= currentPosInBuffer;
+					iterCopy->lengthExtra += currentPosInBuffer;
+
+					uint8_t * buffer = (uint8_t *) realloc(iterCopy->deltaData, iterCopy->lengthDelta);
+					assert(buffer);
+					iterCopy->deltaData = buffer;
+					break;
+				}
+			}
+		}
+		
+		//Okay, does the next page fully fit within this token, halfway between the delta and extra section?
+		if(sectionOfDeltaFallingInNextPage != 0 && sectionOfDeltaFallingInNextPage + iter->lengthExtra >= BLOCK_SIZE)
+		{
+			// :(
+			if(sectionOfDeltaFallingInNextPage < threshold)
+			{
+				iter->lengthDelta -= sectionOfDeltaFallingInNextPage;
+				iter->extraPos -= sectionOfDeltaFallingInNextPage;
+				iter->lengthExtra += sectionOfDeltaFallingInNextPage;
+				
+				uint8_t * buffer = (uint8_t *) realloc(iter->deltaData, iter->lengthDelta);
+				assert(buffer);
+				iter->deltaData = buffer;
+			}
+
+			amountOfDeltaInPage = 0;
+		}
+		else
+		{
+			amountOfDeltaInPage = sectionOfDeltaFallingInNextPage;
+		}
+		
+		//We update the context for the next page
+		currentPage += numberOfPagesToSkip + 1;
+		baseAddressIter += originalTokenSize;
+		
+		assert(amountOfDeltaInPage <= baseAddressIter.value);
+		
+		iter += 1;
+	}
+	
+#ifdef VERY_AGGRESSIVE_ASSERT
+	{
+		Address testAddress(earlySkip);
+		for(const auto & iter : patch)
+		{
+			if(iter.lengthExtra != 0)
+				assert(testAddress.value + iter.lengthDelta == iter.extraPos);
+			testAddress += iter.lengthDelta + iter.lengthExtra;
+		}
+	}
+#endif
+	
+	return deletedSomething;
 }
 
 bool generatePatch(const uint8_t *original, size_t originalLength, const uint8_t *newer, size_t newLength, SchedulerPatch &outputPatch, bool printStats)
@@ -83,7 +260,6 @@ bool generatePatch(const uint8_t *original, size_t originalLength, const uint8_t
 	vector<BSDiffPatch> patch;
 
 	//Generate the diff
-	//TODO: Ignore delta for less than a couple of bytes, too wasteful in COPY encoding
 	//TODO: Introduce a skip field, to go over vast untouched area faster
 	{
 #ifdef PRINT_SPEED
@@ -107,8 +283,16 @@ bool generatePatch(const uint8_t *original, size_t originalLength, const uint8_t
 	if(!validateBSDiff(original, originalLength, newer, newLength, patch, earlySkip))
 		return false;
 
+	//We apply the threshold
+	if(stripDeltaBelowThreshold(patch, earlySkip, BSDIFF_DELTA_REMOVAL_THRESHOLD))
+	{
+#ifdef VERY_AGGRESSIVE_ASSERT
+		assert(validateBSDiff(original, originalLength, newer, newLength, patch, earlySkip));
+#endif
+	}
+
 	//If we don't have extra at the end, we may be able to trim the delta.
-	trimBSDiff(patch);
+	size_t lengthTrimmed = trimBSDiff(patch);
 
 	if(printStats)
 	{
@@ -133,11 +317,22 @@ bool generatePatch(const uint8_t *original, size_t originalLength, const uint8_t
 	size_t currentAddress = earlySkip;
 	for(const auto & cur : patch)
 	{
-		if(cur.lengthDelta == 0)
-			continue;
+		if(cur.lengthDelta != 0)
+		{
+			assert(cur.oldDataAddress + cur.lengthDelta <= originalLength);
+			moves.emplace_back(BSDiffMoves(cur.oldDataAddress, cur.lengthDelta, currentAddress));
+		}
 
-		moves.emplace_back(BSDiffMoves(cur.oldDataAddress, cur.lengthDelta, currentAddress));
 		currentAddress += cur.lengthDelta + cur.lengthExtra;
+		
+		uint8_t * extraData = nullptr;
+		if(cur.lengthExtra)
+		{
+			extraData = (uint8_t *) malloc(cur.lengthExtra);
+			assert(extraData != nullptr);
+			assert(cur.extraPos + cur.lengthExtra <= newLength);
+			memcpy(extraData, &newer[cur.extraPos], cur.lengthExtra);
+		}
 
 		outputPatch.bsdiff.push_back(BSDiff {
 				.delta = {
@@ -146,17 +341,20 @@ bool generatePatch(const uint8_t *original, size_t originalLength, const uint8_t
 				},
 
 				.extra = {
-						.data = cur.extraData,
+						.data = extraData,
 						.length = cur.lengthExtra
 				}
 		});
 	}
 
+	assert(newLength - currentAddress == lengthTrimmed);
+
 	//Extend the last copy if we had to trim it so that the end of the last block is copied
-	if(currentAddress < newLength)
+	if(lengthTrimmed)
 	{
 		assert(!moves.empty());
-		moves.back().length += MIN(newLength - currentAddress, BLOCK_SIZE - (currentAddress & BLOCK_OFFSET_MASK));
+		assert(moves.back().start + moves.back().length + lengthTrimmed <= originalLength);
+		moves.back().length += lengthTrimmed;
 	}
 
 	if(outputPatch.bsdiff.empty())

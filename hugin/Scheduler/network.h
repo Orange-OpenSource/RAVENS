@@ -264,7 +264,7 @@ struct NetworkNode
 
 	bool dispatchInNodes(NetworkNode & node1, NetworkNode & node2);
 
-	void setFinal(size_t finalLength, const VirtualMemory & memoryLayout)
+	void setFinal(size_t finalLength, const BlockID & neighbour, const VirtualMemory & memoryLayout)
 	{
 		isFinal = true;
 
@@ -296,9 +296,10 @@ struct NetworkNode
 				size_t tokenOffset = 0;
 				//We may have final token that migrated in us while we were not ready to turn final.
 				//In this case, we need to add a token so that we can protect against duplicates
+				//We may also need to steal data that was duplicated and marked as for someone else from the block we're being processed with
 				memoryLayout.iterateTranslatedSegments(token.source, token.length, [&](const Address & source, const size_t length)
 				{
-					if(source == block)
+					if(source == block || source == neighbour)
 					{
 						//Insert the token if the data may need backup. This could cause duplicates with data already inserted in the token but removeInternalOverlap will fix that for us
 						selfToken.get().sourceToken.emplace_back(Token(token.destination + tokenOffset, length, token.source + tokenOffset));

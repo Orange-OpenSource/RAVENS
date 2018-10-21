@@ -17,7 +17,7 @@ extern "C" {
 #endif
 
 #include "libhydrogen/hydrogen.h"
-#define CONTEXT "munin"
+#define CONTEXT "RAVMunin"
 
 //General utils
 bool clearMemory(uint8_t * memory, size_t length);

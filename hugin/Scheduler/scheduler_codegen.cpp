@@ -93,7 +93,7 @@ void Scheduler::halfSwapCodeGeneration(NetworkNode & firstNode, NetworkNode & se
 		if(block == secNode.block)
 			memoryLayout.writeTaggedToBlock(block, secNode.blockFinalLayout, commands);
 		else
-			memoryLayout.flushCacheToBlock(block, true, commands);
+			memoryLayout.flushCacheToBlock(block, secNode.block, true, commands);
 
 	}, memoryLayout, commands, false);
 }
@@ -258,7 +258,10 @@ void Scheduler::networkSwapCodeGeneration(const NetworkNode & firstNode, const N
 #endif
 			}
 			else
-				memoryLayout.cacheWrite(curNode.block, curNode.compileLayout(), true, commands);
+			{
+				const BlockID & otherBlock = block == firstNode.block ? secNode.block : firstNode.block;
+				memoryLayout.cacheWrite(curNode.block, curNode.compileLayout(), otherBlock, true, commands);
+			}
 		}
 	}, memoryLayout, commands, true);
 }

@@ -33,10 +33,10 @@ extern "C" uint8_t * readFile(const char * file, size_t * fileSize);
 		size_t lengthExtra;
 
 		uint8_t *deltaData;
-		uint8_t *extraData;
+		size_t extraPos;
 
-		BSDiffPatch(const size_t & oldDataAddress, const size_t & lengthDelta, uint8_t *deltaData, const size_t & lengthExtra, uint8_t * extraData)
-				: oldDataAddress(oldDataAddress), lengthDelta(lengthDelta), lengthExtra(lengthExtra), deltaData(deltaData), extraData(extraData) {}
+		BSDiffPatch(const size_t & oldDataAddress, const size_t & lengthDelta, uint8_t *deltaData, const size_t & lengthExtra, const size_t extraPos)
+				: oldDataAddress(oldDataAddress), lengthDelta(lengthDelta), lengthExtra(lengthExtra), deltaData(deltaData), extraPos(extraPos) {}
 	};
 
 	void bsdiff(const char * oldFile, const char * newFile, std::vector<BSDiffPatch> & patch);

@@ -53,12 +53,16 @@
 //	#define PRINT_BSDIFF
 	#define PRINT_SELECTED_LINKS
 //	#define DISABLE_CHAINED_COPY
+	#define PRINT_BSDIFF_SECTIONS_STATUS
 #endif
 
 #define PRINT_SPEED
 
-//Significant performance penalty
+//Significant performance penalty, ≈ 10% on conflict resolution and the generation of conflict ranges
 #define VERY_AGGRESSIVE_ASSERT
+
+//BSDiff delta removal threshold, in order to save on unecessary instructions
+#define BSDIFF_DELTA_REMOVAL_THRESHOLD 10
 
 //Encoder related config
 #define FLASH_SIZE_BIT_DEFAULT	20u		//How many bits should be used to encode addresses
