@@ -30,7 +30,7 @@ class Odin(BaseHTTPRequestHandler):
 		self.send_response(403)
 		self.end_headers()
 
-	def processFirstManifest(self):
+	def processManifest(self):
 		userAgent, version = self.headers.get('User-Agent').split('/', 1)
 
 		try:
@@ -56,15 +56,15 @@ class Odin(BaseHTTPRequestHandler):
 
 	def do_GET(self):
 
-		if self.path == '/manifest1':
-			self.processFirstManifest()
+		if self.path == '/manifest':
+			self.processManifest()
 
 		else:
 			self.send_response(302)
 			self.send_header('Location', 'http://www.nyan.cat/original')
 			self.end_headers()
 
-	def processSecManifest(self):
+	def processPayload(self):
 		userAgent, version = self.headers.get('User-Agent').split('/', 1)
 
 		try:
@@ -102,8 +102,8 @@ class Odin(BaseHTTPRequestHandler):
 
 	def do_POST(self):
 
-		if self.path == '/manifest2':
-			self.processSecManifest()
+		if self.path == '/payload':
+			self.processPayload()
 
 		else:
 			self.send_response(302)

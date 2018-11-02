@@ -32,7 +32,7 @@ typedef unsigned int uint;
 
 const uint8_t __attribute__((section(".rodata.Hermes.storageRoom"), aligned(BLOCK_SIZE))) updateStorage[16 * BLOCK_SIZE] = {0xff};	//65kB of room.
 
-void sendRequest()
+void sendManifestRequest()
 {
 	char version[sizeof(criticalMetadata.versionID) * 3 + 1];
 
@@ -81,22 +81,22 @@ void processValidationRequest(UpdateHashRequest * extraValidation, char ** respo
 	}
 }
 
-void sendManifest2Request(const char * validationString, uint32_t validationStringLength)
+void sendPayloadRequest(const char * validationString, uint32_t validationStringLength)
 {
 	char version[sizeof(criticalMetadata.versionID) * 3 + 1];
 	itoa(criticalMetadata.versionID, version, 10);
 	uint8_t versionLength = (uint8_t) strlen(version);
 
-	uint length = sizeof(MAN2_REQUEST) - 1;
-	char request[sizeof(MAN2_REQUEST) + versionLength + sizeof(MAN2_SEC_REQUEST) + sizeof(version) + sizeof(FINAL_REQUEST) + validationStringLength + 1];
+	uint length = sizeof(PAYL_REQUEST) - 1;
+	char request[sizeof(PAYL_REQUEST) + versionLength + sizeof(PAYL_SEC_REQUEST) + sizeof(version) + sizeof(FINAL_REQUEST) + validationStringLength + 1];
 
-	strcpy(request, MAN2_REQUEST);
+	strcpy(request, PAYL_REQUEST);
 
 	strcpy(&request[length], version);
 	length += versionLength;
 
-	strcpy(&request[length], MAN2_SEC_REQUEST);
-	length += sizeof(MAN2_SEC_REQUEST) - 1;
+	strcpy(&request[length], PAYL_SEC_REQUEST);
+	length += sizeof(PAYL_SEC_REQUEST) - 1;
 
 	itoa(validationStringLength, version, 10);
 	strcpy(&request[length], version);
@@ -119,7 +119,7 @@ uint32_t getVersion()
 
 void checkUpdate()
 {
-	sendRequest();
+	sendManifestRequest();
 
 	//Wait for data
 	uint8_t networkStatus;
@@ -182,7 +182,7 @@ void checkUpdate()
 	}
 
 	//Send the request. Meanwhile, we start writing the header
-	sendManifest2Request(challengeResponse, challengeResponseLength);
+	sendPayloadRequest(challengeResponse, challengeResponseLength);
 
 	//Flush the space necessary to write the update
 	eraseNecessarySpace((const void *) updateStorage, sizeof(UpdateHeader) + header->sectionSignedDeviceKey.manifestLength);

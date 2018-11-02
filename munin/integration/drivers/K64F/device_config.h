@@ -39,12 +39,12 @@
 
 //Update requests
 
-#define BASE_REQUEST "GET /manifest1 HTTP/1.1\r\nHost: " UPDATE_SERVER ":" STR(UPDATE_SERVER_PORT) "\r\nUser-Agent: " DEVICE_NAME "/"
+#define BASE_REQUEST "GET /manifest HTTP/1.1\r\nHost: " UPDATE_SERVER ":" STR(UPDATE_SERVER_PORT) "\r\nUser-Agent: " DEVICE_NAME "/"
 #define SEC_REQUEST "\r\nX-Update-Challenge: "
 #define FINAL_REQUEST "\r\n\r\n"
 
-#define MAN2_REQUEST "POST /manifest2 HTTP/1.1\r\nHost: " UPDATE_SERVER ":" STR(UPDATE_SERVER_PORT) "\r\nUser-Agent: " DEVICE_NAME "/"
-#define MAN2_SEC_REQUEST "\r\nContent-Length: "
+#define PAYL_REQUEST "POST /payload HTTP/1.1\r\nHost: " UPDATE_SERVER ":" STR(UPDATE_SERVER_PORT) "\r\nUser-Agent: " DEVICE_NAME "/"
+#define PAYL_SEC_REQUEST "\r\nContent-Length: "
 
 #define EXPECTED_REPLY_UPDATE "HTTP/1.0 200 OK\r\nServer: " UPDATE_SERVER_NAME "\r\nDate: \r\n\r\n"
 #define EXPECTED_REPLY_NO_UPDATE "HTTP/1.0 204 No Content\r\nServer: " UPDATE_SERVER_NAME "\r\nDate: \r\n\r\n"
