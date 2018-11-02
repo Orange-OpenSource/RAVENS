@@ -16,7 +16,7 @@
 //Device config
 
 #define DEVICE_NAME "FactorioBot"
-#define UPDATE_SERVER_NAME "Zeus"
+#define UPDATE_SERVER_NAME "Odin"
 #define UPDATE_SERVER "172.16.0.85"
 #define UPDATE_SERVER_PORT 8080
 

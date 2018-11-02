@@ -38,14 +38,14 @@ def getAuthorization(default="yes"):
 
 def runImported():
 	parser = argparse.ArgumentParser(
-		description='Import the update files to a new firmware version into a Zeus server.')
+		description='Import the update files to a new firmware version into a Odin server.')
 	parser.add_argument('-d', '--deviceName', metavar='device', required=True, help='the name of the device to import')
 	parser.add_argument('-i', '--importPath', metavar='importPath', required=True,
 						help='path to the directory containing the update.json to import')
 	parser.add_argument('-o', '--output', metavar='server', default='.',
-						help='path to the Zeus "update" directory (-o /path/to/zeus/update/)')
+						help='path to the Odin "update" directory (-o /path/to/Odin/update/)')
 	parser.add_argument('-s', '--signUtil', metavar='sign',
-						help='the signing util Zeus should use to sign its answers to devices')
+						help='the signing util Odin should use to sign its answers to devices')
 	args, _ = parser.parse_known_args(sys.argv)
 
 	if len(args.output) == 0 or len(args.deviceName) == 0:
@@ -77,7 +77,7 @@ def runImported():
 
 	if args.deviceName not in output:
 		if "signUtil" not in args:
-			print("The --signUtil flag is mandatory when the device isn't already in Zeus' database")
+			print("The --signUtil flag is mandatory when the device isn't already in Odin's database")
 			return
 
 		entry = {'sign_util': args.signUtil}

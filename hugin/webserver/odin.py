@@ -13,8 +13,8 @@ from server import runServer
 
 
 def printHelp():
-	print("Need at list one argument (server or import): \nArgument `server` start the Zeus server.")
-	print("Argument `import` import a config to Zeus")
+	print("Need at list one argument (server or import): \nArgument `server` start the Odin server.")
+	print("Argument `import` import a config to Odin")
 
 
 if __name__ == '__main__':

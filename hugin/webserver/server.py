@@ -16,10 +16,10 @@ from update import updateRequest, replyChallenge, getMainPayloadUpdateFile, send
 
 PORT_NUMBER = 8080
 
-class Zeus(BaseHTTPRequestHandler):
+class Odin(BaseHTTPRequestHandler):
 
 	def version_string(self):
-		return "Zeus"
+		return "Odin"
 
 	def date_time_string(self, timestamp=None):
 		return ""
@@ -113,7 +113,7 @@ class Zeus(BaseHTTPRequestHandler):
 
 def runServer():
 	server_class = HTTPServer
-	httpd = server_class(('0.0.0.0', PORT_NUMBER), Zeus)
+	httpd = server_class(('0.0.0.0', PORT_NUMBER), Odin)
 	print(time.asctime(), "Server Starts - %d" % PORT_NUMBER)
 
 	try:
