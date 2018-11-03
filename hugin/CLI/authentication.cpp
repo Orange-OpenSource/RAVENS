@@ -28,7 +28,7 @@ using namespace std;
 
 void printAuthenticationHelp()
 {
-	cout << endl << "The authenticate option lets you sign patches and generate the key necessary to Zeus." << endl;
+	cout << endl << "The authenticate option lets you sign patches and generate the key necessary to Odin." << endl;
 	cout << "This option require access to the device private key." << endl;
 	cout << "Therefore, this should ONLY be called on a secure, isolated server (hopefully with an HSM involved)."<< endl;
 	cout << "The diff and authenticate options are separated precisely to enforce this separation." << endl << endl;

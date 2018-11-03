@@ -16,10 +16,10 @@ from update import updateRequest, replyChallenge, getMainPayloadUpdateFile, send
 
 PORT_NUMBER = 8080
 
-class Zeus(BaseHTTPRequestHandler):
+class Odin(BaseHTTPRequestHandler):
 
 	def version_string(self):
-		return "Zeus"
+		return "Odin"
 
 	def date_time_string(self, timestamp=None):
 		return ""
@@ -30,7 +30,7 @@ class Zeus(BaseHTTPRequestHandler):
 		self.send_response(403)
 		self.end_headers()
 
-	def processFirstManifest(self):
+	def processManifest(self):
 		userAgent, version = self.headers.get('User-Agent').split('/', 1)
 
 		try:
@@ -56,15 +56,15 @@ class Zeus(BaseHTTPRequestHandler):
 
 	def do_GET(self):
 
-		if self.path == '/manifest1':
-			self.processFirstManifest()
+		if self.path == '/manifest':
+			self.processManifest()
 
 		else:
 			self.send_response(302)
 			self.send_header('Location', 'http://www.nyan.cat/original')
 			self.end_headers()
 
-	def processSecManifest(self):
+	def processPayload(self):
 		userAgent, version = self.headers.get('User-Agent').split('/', 1)
 
 		try:
@@ -102,8 +102,8 @@ class Zeus(BaseHTTPRequestHandler):
 
 	def do_POST(self):
 
-		if self.path == '/manifest2':
-			self.processSecManifest()
+		if self.path == '/payload':
+			self.processPayload()
 
 		else:
 			self.send_response(302)
@@ -113,7 +113,7 @@ class Zeus(BaseHTTPRequestHandler):
 
 def runServer():
 	server_class = HTTPServer
-	httpd = server_class(('0.0.0.0', PORT_NUMBER), Zeus)
+	httpd = server_class(('0.0.0.0', PORT_NUMBER), Odin)
 	print(time.asctime(), "Server Starts - %d" % PORT_NUMBER)
 
 	try:

@@ -42,11 +42,11 @@ Assuming this is the case, this is done, the following command will make Hugin s
 ## Import an update to the server
 
 A small Python server implement Munin's protocol and provide various security guarantees.
-Importing the updates to the server is done with the following command: `python3 hugin/webserver/zeus.py import -d <Device Name> -i path/to/signed/output/directory/ -o /path/to/server/update/storage/`
+Importing the updates to the server is done with the following command: `python3 hugin/webserver/odin.py import -d <Device Name> -i path/to/signed/output/directory/ -o /path/to/server/update/storage/`
 
 ## Launching the server
 
-Launching the small Python server is done with the following command: `python3 hugin/webserver/zeus.py server`.
+Launching the small Python server is done with the following command: `python3 hugin/webserver/odin.py server`.
 The port is configured at the top of `server.py`.
 
 ## Generate cryptographic keys
