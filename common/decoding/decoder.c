@@ -63,9 +63,9 @@ HERMES_CRITICAL uint64_t readBits(const uint8_t * bitField, size_t * currentOffs
 
 HERMES_CRITICAL size_t readBlockID(DecoderContext * context, const uint8_t * byteStream, size_t * currentByteOffset, size_t length)
 {
-	const size_t baseBlockID = readBits(byteStream, currentByteOffset, length, context->blockIDBits) + context->blockBase;
+	const size_t baseBlockID = readBits(byteStream, currentByteOffset, length, context->blockIDBits);
 
-	return (baseBlockID & MASK_OF_WIDTH(context->blockIDBits)) << context->blockSizeBitsRef;
+	return context->blockBase + ((baseBlockID & MASK_OF_WIDTH(context->blockIDBits)) << context->blockSizeBitsRef);
 }
 
 HERMES_CRITICAL bool decodeInstruction(DecoderContext * context, const uint8_t * byteStream, size_t * currentByteOffset, const size_t length, DecodedCommand * command)
