@@ -37,6 +37,7 @@ __FBSDID("$FreextraBufferSD: src/usr.bin/bsdiff/bsdiff/bsdiff.c,v 1.1 2005/08/06
 #include <cstdio>
 #include <cassert>
 #include <climits>
+#include <iostream>
 
 #define BSDIFF_PRIVATE
 
@@ -321,9 +322,11 @@ bool writeBSDiff(const SchedulerPatch & patch, void * output)
 		index += command.extra.length;
 	}
 
-	assert(patch.newRanges.size() < UINT16_MAX);
-	*(uint16_t *) &uncompressedBuffer[index] = static_cast<uint16_t>(patch.newRanges.size());
+	uint16_t * newRangesCounter = (uint16_t *) &uncompressedBuffer[index];
 	index += sizeof(uint16_t);
+	
+	assert(patch.newRanges.size() < UINT16_MAX);
+	*newRangesCounter = static_cast<uint16_t>(patch.newRanges.size());
 
 	//Copy the ranges the bootloader need to verify
 	for(const auto & range : patch.newRanges)
@@ -337,6 +340,12 @@ bool writeBSDiff(const SchedulerPatch & patch, void * output)
 		{
 			memcpy(&uncompressedBuffer[index], &verif, sizeof(verif));
 			index += sizeof(verif);
+		}
+		else
+		{
+			std::cerr << "[WARNING]: Skipping range starting at 0x" << std::hex << range.start << " of length 0x" << range.length << " due to libHydrogen's hydro_hex2bin failing on " << std::dec << range.expectedHash.c_str() << std::endl;
+			assert(*newRangesCounter > 0);
+			*newRangesCounter -= 1;
 		}
 	}
 
