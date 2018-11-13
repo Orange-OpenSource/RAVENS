@@ -241,6 +241,7 @@ void VirtualMemory::_loadTaggedToTMP(const DetailedBlock & dataToLoad, Scheduler
 				while(tmpSegment->length < segment.length)
 				{
 					//This usually mean we don't have enough room in the cache, which is not supposed to be possible as our caller check for that. This assert is _big_ trouble, and probably means extractSubSectionToLoad is failing
+					// TODO: The algorithm could be improved by going backward. That would translate in possibly more memory operations but less instructions
 					assert((tmpSegment + 1) != tmpLayoutCopy.segments.end());
 
 					auto currentSegment = *tmpSegment, nextSegment = *(tmpSegment + 1);
