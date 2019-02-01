@@ -17,7 +17,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
-#include "crypto.h"
+#include "crypto_utils.h"
 
 bool signFile(const char *inputFile, const char *outputFile, const char *privKeyFile)
 {

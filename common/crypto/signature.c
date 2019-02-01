@@ -12,7 +12,7 @@
  */
 
 #include "hydrogen.h"
-#include "crypto.h"
+#include "crypto_utils.h"
 
 #ifdef TARGET_LIKE_MBED
 #include "../core.h"

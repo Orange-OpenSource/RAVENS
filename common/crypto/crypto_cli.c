@@ -14,7 +14,7 @@
 #include <stdbool.h>
 #include <string.h>
 #include "crypto_cli.h"
-#include "crypto.h"
+#include "crypto_utils.h"
 
 void printCryptoHelp()
 {

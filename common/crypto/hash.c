@@ -14,7 +14,7 @@
 #include "sha256.h"
 #include <stdbool.h>
 #include <stdio.h>
-#include "crypto.h"
+#include "crypto_utils.h"
 
 #ifdef TARGET_LIKE_MBED
 #include "../core.h"

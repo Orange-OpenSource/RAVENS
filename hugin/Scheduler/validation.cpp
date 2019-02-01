@@ -24,7 +24,7 @@ using namespace std;
 #include "validation.h"
 #include "Encoding/encoder.h"
 #include "scheduler.h"
-#include <crypto.h>
+#include <crypto_utils.h>
 
 struct VerificationRangeCollector
 {

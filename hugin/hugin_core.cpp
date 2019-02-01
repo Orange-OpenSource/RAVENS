@@ -14,7 +14,7 @@
 #include <ostream>
 #include <cstring>
 #include <vector>
-#include <crypto/crypto.h>
+#include <crypto/crypto_utils.h>
 #include "CLI/scheduler_cli.h"
 
 extern "C"

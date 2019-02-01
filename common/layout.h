@@ -13,7 +13,7 @@
 #ifndef PERSISTANCE_LAYOUT_H
 #define PERSISTANCE_LAYOUT_H
 
-#include "crypto/crypto.h"
+#include "crypto/crypto_utils.h"
 
 #define MANIFEST_FORMAT_VERSION 0
 #define BSDIFF_MAGIC 0x5ec1714e

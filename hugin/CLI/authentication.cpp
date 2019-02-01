@@ -19,7 +19,7 @@
 #include <libhydrogen/hydrogen.h>
 #include "../Scheduler/config.h"
 #include <layout.h>
-#include <crypto.h>
+#include <crypto_utils.h>
 #include <rapidjson/document.h>
 #include <rapidjson/filewritestream.h>
 #include <rapidjson/prettywriter.h>

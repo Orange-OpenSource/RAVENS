@@ -14,7 +14,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdint.h>
-#include "crypto.h"
+#include "crypto_utils.h"
 
 //Should always return unless compiler got funny
 bool clearMemory(uint8_t * memory, size_t length)
@@ -223,7 +223,7 @@ bool testSignature(const uint8_t * message, bool wantFail, const char * privKeyF
 			output = false;
 		}
 	}
-	
+
 	return output;
 }
 

@@ -7,6 +7,7 @@
 	},
 	"target_overrides": {
 		"*": {
+            "target.extra_labels_add": ["PSA"],
 			"target.features_add": ["COMMON_PAL"],
             "platform.stdio-baud-rate": 115200,
             "platform.stdio-convert-newlines": true
