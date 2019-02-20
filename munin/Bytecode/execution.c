@@ -27,7 +27,7 @@ static uint8_t writeCache[WRITE_GRANULARITY] = {0};
 static uint8_t currentWriteCachePos = 0;
 static size_t prevDest = 0;
 
-HERMES_CRITICAL void performCopyWithCache(size_t dest, const uint8_t * source, size_t length)
+RAVENS_CRITICAL void performCopyWithCache(size_t dest, const uint8_t * source, size_t length)
 {
 	//The previous write was misaligned
 	if(currentWriteCachePos != 0)
@@ -85,7 +85,7 @@ HERMES_CRITICAL void performCopyWithCache(size_t dest, const uint8_t * source, s
 	}
 }
 
-HERMES_CRITICAL void flushCopyCache()
+RAVENS_CRITICAL void flushCopyCache()
 {
 	if(currentWriteCachePos != 0)
 	{
@@ -95,7 +95,7 @@ HERMES_CRITICAL void flushCopyCache()
 	}
 }
 
-HERMES_CRITICAL void performCopy(const DecodedCommand decodedCommand)
+RAVENS_CRITICAL void performCopy(const DecodedCommand decodedCommand)
 {
 	if(decodedCommand.command == OPCODE_COPY_CC)
 	{
@@ -115,7 +115,7 @@ HERMES_CRITICAL void performCopy(const DecodedCommand decodedCommand)
 	}
 }
 
-HERMES_CRITICAL bool processInstruction(const DecodedCommand decodedCommand, size_t * stepCount, ChainAddress *chainAddress, bool * fastForward)
+RAVENS_CRITICAL bool processInstruction(const DecodedCommand decodedCommand, size_t * stepCount, ChainAddress *chainAddress, bool * fastForward)
 {
 	switch(decodedCommand.command)
 	{
@@ -295,7 +295,7 @@ HERMES_CRITICAL bool processInstruction(const DecodedCommand decodedCommand, siz
 	return true;
 }
 
-HERMES_CRITICAL bool runCommands(const uint8_t * bytes, size_t * currentByteOffset, size_t length, size_t *currentTrace, size_t oldCounter, bool dryRun)
+RAVENS_CRITICAL bool runCommands(const uint8_t * bytes, size_t * currentByteOffset, size_t length, size_t *currentTrace, size_t oldCounter, bool dryRun)
 {
 	DecoderContext decoderContext = {
 			.usingBlock = false,

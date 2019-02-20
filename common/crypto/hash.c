@@ -19,7 +19,7 @@
 #ifdef TARGET_LIKE_MBED
 #include "../core.h"
 #else
-#define HERMES_CRITICAL
+#define RAVENS_CRITICAL
 #endif
 
 void hashBlock(const uint8_t * data, const size_t length, const uint16_t counter, bool reuseHash, uint8_t * hashBuffer)
@@ -41,7 +41,7 @@ void hashBlock(const uint8_t * data, const size_t length, const uint16_t counter
     mbedtls_sha256_free( &ctx );
 }
 
-HERMES_CRITICAL void hashMemory(const uint8_t * data, const size_t length, uint8_t * hashBuffer)
+RAVENS_CRITICAL void hashMemory(const uint8_t * data, const size_t length, uint8_t * hashBuffer)
 {
 	mbedtls_sha256_ret(data, length, hashBuffer, 0);
 }

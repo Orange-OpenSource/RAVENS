@@ -53,7 +53,7 @@ void backupCache(size_t counter)
 	}
 }
 
-HERMES_CRITICAL void restoreCache(size_t counter)
+RAVENS_CRITICAL void restoreCache(size_t counter)
 {
 	if(counter & 2u)
 		memcpy(cacheRAM, backupCache1, BLOCK_SIZE);
@@ -61,7 +61,7 @@ HERMES_CRITICAL void restoreCache(size_t counter)
 		memcpy(cacheRAM, backupCache2, BLOCK_SIZE);
 }
 
-HERMES_CRITICAL void setMetadataPage(const UpdateMetadata * currentMetadata, const UpdateHeader * updateLocation, uint32_t multiplier)
+RAVENS_CRITICAL void setMetadataPage(const UpdateMetadata * currentMetadata, const UpdateHeader * updateLocation, uint32_t multiplier)
 {
 	size_t newMetadata;
 
@@ -100,7 +100,7 @@ HERMES_CRITICAL void setMetadataPage(const UpdateMetadata * currentMetadata, con
 	writeToNAND((size_t) &currentMetadata->footer.notExpired, sizeof(footer.notExpired), (const uint8_t *) &footer.notExpired);
 }
 
-HERMES_CRITICAL void resetMetadataPage(const UpdateMetadata * currentMetadata, uint32_t multiplier)
+RAVENS_CRITICAL void resetMetadataPage(const UpdateMetadata * currentMetadata, uint32_t multiplier)
 {
 	return setMetadataPage(currentMetadata, currentMetadata->location, multiplier);
 }
@@ -113,7 +113,7 @@ HERMES_CRITICAL void resetMetadataPage(const UpdateMetadata * currentMetadata, u
 
 #define USABLE_BIT_FIELD_COUNTER (sizeof(((UpdateMetadata *) 0)->bitField) / CURRENT_COUNTER_WIDTH)
 
-HERMES_CRITICAL void incrementCounter(size_t *counter, size_t oldCounter, bool *fastForward)
+RAVENS_CRITICAL void incrementCounter(size_t *counter, size_t oldCounter, bool *fastForward)
 {
 	*counter += 1;
 
@@ -146,7 +146,7 @@ HERMES_CRITICAL void incrementCounter(size_t *counter, size_t oldCounter, bool *
 	}
 }
 
-HERMES_CRITICAL size_t getCurrentCounter()
+RAVENS_CRITICAL size_t getCurrentCounter()
 {
 	volatile const UpdateMetadata * metadata = getMetadata();
 	assert(isMetadataValid(*metadata));
@@ -172,7 +172,7 @@ HERMES_CRITICAL size_t getCurrentCounter()
 	return output;
 }
 
-HERMES_CRITICAL bool writeToNAND(size_t address, size_t length, const uint8_t * source)
+RAVENS_CRITICAL bool writeToNAND(size_t address, size_t length, const uint8_t * source)
 {
 	//If misaligned, we keep the old data before our insertion point
 	uint8_t misalignment = (uint8_t) (address & WRITE_GRANULARITY_MASK);
@@ -227,7 +227,7 @@ HERMES_CRITICAL bool writeToNAND(size_t address, size_t length, const uint8_t * 
 	return true;
 }
 
-HERMES_CRITICAL void erasePage(size_t address)
+RAVENS_CRITICAL void erasePage(size_t address)
 {
 	assert((address & BLOCK_OFFSET_MASK) == 0);
 	eraseSector(address);

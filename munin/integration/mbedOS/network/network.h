@@ -10,8 +10,8 @@
  * @author Emile-Hugo Spir
  */
 
-#ifndef HERMES_NETWORK_H
-#define HERMES_NETWORK_H
+#ifndef RAVENS_NETWORK_H
+#define RAVENS_NETWORK_H
 
 typedef struct
 {
@@ -41,4 +41,4 @@ enum
 	NETWORK_HAS_DATA
 };
 
-#endif //HERMES_NETWORK_H
+#endif //RAVENS_NETWORK_H

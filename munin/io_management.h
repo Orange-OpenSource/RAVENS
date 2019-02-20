@@ -10,8 +10,8 @@
  * @author Emile-Hugo Spir
  */
 
-#ifndef HERMES_IO_MANAGEMENT_H
-#define HERMES_IO_MANAGEMENT_H
+#ifndef RAVENS_IO_MANAGEMENT_H
+#define RAVENS_IO_MANAGEMENT_H
 
 #include <stdbool.h>
 #include "device/device_config.h"
@@ -38,4 +38,4 @@ extern uint8_t cacheRAM[BLOCK_SIZE];
 bool writeToNAND(size_t address, size_t length, const uint8_t * source);
 void erasePage(size_t address);
 
-#endif //HERMES_IO_MANAGEMENT_H
+#endif //RAVENS_IO_MANAGEMENT_H

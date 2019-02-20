@@ -28,12 +28,12 @@ extern const UpdateMetadata updateMetadataSec;
 extern const uint8_t backupCache1[BLOCK_SIZE];
 extern const uint8_t backupCache2[BLOCK_SIZE];
 
-HERMES_CRITICAL const uint8_t * getBuffer(const size_t traceCounter)
+RAVENS_CRITICAL const uint8_t * getBuffer(const size_t traceCounter)
 {
 	return traceCounter & 2u ? backupCache2 : backupCache1;
 }
 
-HERMES_CRITICAL void savePageToBuffer(const size_t blockAddress, const size_t traceCounter)
+RAVENS_CRITICAL void savePageToBuffer(const size_t blockAddress, const size_t traceCounter)
 {
 	const uint8_t * cache = getBuffer(traceCounter);
 
@@ -41,7 +41,7 @@ HERMES_CRITICAL void savePageToBuffer(const size_t blockAddress, const size_t tr
 	writeToNAND((size_t) cache, sizeof(backupCache1), (const uint8_t *) (blockAddress & ~BLOCK_OFFSET_MASK));
 }
 
-HERMES_CRITICAL uint8_t consumeByte(BSDiffContext * context)
+RAVENS_CRITICAL uint8_t consumeByte(BSDiffContext * context)
 {
 	if(context->currentCacheOffset >= context->lengthLeft)
 	{
@@ -63,7 +63,7 @@ HERMES_CRITICAL uint8_t consumeByte(BSDiffContext * context)
 	return output;
 }
 
-HERMES_CRITICAL uint16_t consumeWord(BSDiffContext * context)
+RAVENS_CRITICAL uint16_t consumeWord(BSDiffContext * context)
 {
 	if(context->currentCacheOffset + 2 > context->lengthLeft)
 	{
@@ -85,7 +85,7 @@ HERMES_CRITICAL uint16_t consumeWord(BSDiffContext * context)
 	return output;
 }
 
-HERMES_CRITICAL uint32_t consumeDWord(BSDiffContext * context)
+RAVENS_CRITICAL uint32_t consumeDWord(BSDiffContext * context)
 {
 	//Not enough room to get the full DWord in one go in the available buffer
 	if(context->currentCacheOffset + 4 > context->lengthLeft)
@@ -108,7 +108,7 @@ HERMES_CRITICAL uint32_t consumeDWord(BSDiffContext * context)
 	return output;
 }
 
-HERMES_CRITICAL uint64_t consumeQWord(BSDiffContext * context)
+RAVENS_CRITICAL uint64_t consumeQWord(BSDiffContext * context)
 {
 	union {
 		uint64_t qword;
@@ -121,7 +121,7 @@ HERMES_CRITICAL uint64_t consumeQWord(BSDiffContext * context)
 	return qword.qword;
 }
 
-HERMES_CRITICAL bool performValidation(BSDiffContext * context, bool dryRun)
+RAVENS_CRITICAL bool performValidation(BSDiffContext * context, bool dryRun)
 {
 	//We at least need a word. This means we ran out of data before, which is bad
 	if(context->isOutOfData)
@@ -156,7 +156,7 @@ HERMES_CRITICAL bool performValidation(BSDiffContext * context, bool dryRun)
 	return true;
 }
 
-HERMES_CRITICAL void addByteToOutputBuffer(uint8_t byte, size_t virtualAddress, uint8_t * currentCounter)
+RAVENS_CRITICAL void addByteToOutputBuffer(uint8_t byte, size_t virtualAddress, uint8_t * currentCounter)
 {
 	static uint8_t writeBuffer[WRITE_GRANULARITY];
 
@@ -199,7 +199,7 @@ HERMES_CRITICAL void addByteToOutputBuffer(uint8_t byte, size_t virtualAddress, 
 
 #include <stdio.h>
 
-HERMES_CRITICAL bool applyDeltaPatch(const UpdateHeader * header, size_t currentIndex, size_t traceCounter, size_t previousCounter, bool dryRun)
+RAVENS_CRITICAL bool applyDeltaPatch(const UpdateHeader * header, size_t currentIndex, size_t traceCounter, size_t previousCounter, bool dryRun)
 {
 	bool resuming = (dryRun || traceCounter < previousCounter), *pResuming = dryRun ? NULL : &resuming;
 

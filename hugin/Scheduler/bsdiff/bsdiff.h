@@ -24,7 +24,7 @@ extern "C"
 
 extern "C" uint8_t * readFile(const char * file, size_t * fileSize);
 
-#ifdef HERMES_PUBLIC_COMMAND_H
+#ifdef RAVENS_PUBLIC_COMMAND_H
 
 	struct BSDiffPatch
 	{

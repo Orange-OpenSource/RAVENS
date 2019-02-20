@@ -10,8 +10,8 @@
  * @author Emile-Hugo Spir
  */
 
-#ifndef HERMES_DEVICE_CONFIG_H
-#define HERMES_DEVICE_CONFIG_H
+#ifndef RAVENS_DEVICE_CONFIG_H
+#define RAVENS_DEVICE_CONFIG_H
 
 //Device config
 
@@ -49,4 +49,4 @@
 #define EXPECTED_REPLY_UPDATE "HTTP/1.0 200 OK\r\nServer: " UPDATE_SERVER_NAME "\r\nDate: \r\n\r\n"
 #define EXPECTED_REPLY_NO_UPDATE "HTTP/1.0 204 No Content\r\nServer: " UPDATE_SERVER_NAME "\r\nDate: \r\n\r\n"
 
-#endif //HERMES_DEVICE_CONFIG_H
+#endif //RAVENS_DEVICE_CONFIG_H

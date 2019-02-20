@@ -26,7 +26,7 @@
 #include "validation.h"
 #include "core.h"
 
-HERMES_CRITICAL bool validateSectionSignedWithDeviceKey(const UpdateHeader * header)
+RAVENS_CRITICAL bool validateSectionSignedWithDeviceKey(const UpdateHeader * header)
 {
 	if(header->sectionSignedDeviceKey.formatVersion != criticalMetadata.formatVersionCompatibility)
 		return false;
@@ -37,7 +37,7 @@ HERMES_CRITICAL bool validateSectionSignedWithDeviceKey(const UpdateHeader * hea
 									criticalMetadata.devicePublicKey);
 }
 
-HERMES_CRITICAL bool validateSectionSignedWithUpdateKey(const UpdateHeader * header)
+RAVENS_CRITICAL bool validateSectionSignedWithUpdateKey(const UpdateHeader * header)
 {
 	//Authenticate the challenge reply. The signature is performed on the following data: Challenge + vID + updateKey + random
 	uint8_t challenge[sizeof(criticalMetadata.updateChallenge) + sizeof(header->sectionSignedDeviceKey.oldVersionID) + sizeof(uint32_t) + sizeof(header->sectionSignedDeviceKey.updatePubKey) + sizeof(header->sectionSignedUpdateKey.random)];
@@ -67,7 +67,7 @@ HERMES_CRITICAL bool validateSectionSignedWithUpdateKey(const UpdateHeader * hea
 								 (const uint8_t *) header->sectionSignedDeviceKey.updatePubKey);
 }
 
-HERMES_CRITICAL bool validateImage(const UpdateHeader * header)
+RAVENS_CRITICAL bool validateImage(const UpdateHeader * header)
 {
 	uint8_t hash[HASH_LENGTH];
 	hashMemory((const uint8_t *) header + sizeof(UpdateHeader), header->sectionSignedDeviceKey.manifestLength, hash);
@@ -75,7 +75,7 @@ HERMES_CRITICAL bool validateImage(const UpdateHeader * header)
 	return memcmp(hash, header->sectionSignedDeviceKey.updateHash, HASH_LENGTH) == 0;
 }
 
-HERMES_CRITICAL bool validateHeader(const UpdateHeader * header)
+RAVENS_CRITICAL bool validateHeader(const UpdateHeader * header)
 {
 	//Authenticate the header sectionSignedDeviceKey with the master key
 	if(!validateSectionSignedWithDeviceKey(header))
@@ -98,7 +98,7 @@ HERMES_CRITICAL bool validateHeader(const UpdateHeader * header)
 	return true;
 }
 
-HERMES_CRITICAL bool validateExtraValidation(const UpdateHashRequest * request)
+RAVENS_CRITICAL bool validateExtraValidation(const UpdateHashRequest * request)
 {
 	return validateSignature((const uint8_t *) request + SIGNATURE_LENGTH,
 									request->numberValidation * sizeof(request->validateSegment[0]) + sizeof(request->numberValidation),

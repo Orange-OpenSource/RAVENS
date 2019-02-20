@@ -10,9 +10,9 @@
  * @author Emile-Hugo Spir
  */
 
-#ifndef HERMES_BSDIFF_H
-#define HERMES_BSDIFF_H
+#ifndef RAVENS_BSDIFF_H
+#define RAVENS_BSDIFF_H
 
 bool applyDeltaPatch(const UpdateHeader * header, size_t currentIndex, size_t traceCounter, size_t previousCounter, bool dryRun);
 
-#endif //HERMES_BSDIFF_H
+#endif //RAVENS_BSDIFF_H

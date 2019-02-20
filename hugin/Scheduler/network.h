@@ -10,8 +10,8 @@
  * @author Emile-Hugo Spir
  */
 
-#ifndef HERMES_NETWORK_H
-#define HERMES_NETWORK_H
+#ifndef RAVENS_NETWORK_H
+#define RAVENS_NETWORK_H
 
 #include <functional>
 #include <unordered_set>
@@ -397,4 +397,4 @@ public:
 	void performFinalFlush(SchedulerData & schedulerData);
 };
 
-#endif //HERMES_NETWORK_H
+#endif //RAVENS_NETWORK_H

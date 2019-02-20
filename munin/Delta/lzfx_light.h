@@ -10,8 +10,8 @@
  * @author Emile-Hugo Spir
  */
 
-#ifndef HERMES_LZFX_LIGHT_H
-#define HERMES_LZFX_LIGHT_H
+#ifndef RAVENS_LZFX_LIGHT_H
+#define RAVENS_LZFX_LIGHT_H
 
 #define LZFX_ECORRUPT   (-2)      /* Invalid data for decompression */
 #define LZFX_EARGS      (-3)      /* Arguments invalid (NULL) */
@@ -56,4 +56,4 @@ typedef struct
 
 int lzfx_decompress(Lzfx4KContext * context, uint16_t *outputLength);
 
-#endif //HERMES_LZFX_LIGHT_H
+#endif //RAVENS_LZFX_LIGHT_H

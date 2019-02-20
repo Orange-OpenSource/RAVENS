@@ -32,7 +32,7 @@ typedef unsigned int uint;
  * (https://stackoverflow.com/a/6615788)
  */
 
-volatile const UpdateMetadata __attribute__((section(".rodata.Hermes.metadata$1"), aligned(BLOCK_SIZE))) updateMetadataMain = {
+volatile const UpdateMetadata __attribute__((section(".rodata.Ravens.metadata$1"), aligned(BLOCK_SIZE))) updateMetadataMain = {
 		.location = 0,
 		.bitField = {[0 ... (sizeof(updateMetadataMain.bitField) - 1)] = 0xff},
 		.footer = {
@@ -41,7 +41,7 @@ volatile const UpdateMetadata __attribute__((section(".rodata.Hermes.metadata$1"
 				.notExpired = DEFAULT_64B_FLASH_VALUE
 		}};
 
-volatile const UpdateMetadata __attribute__((section(".rodata.Hermes.metadata$3"), aligned(BLOCK_SIZE))) updateMetadataSec = {
+volatile const UpdateMetadata __attribute__((section(".rodata.Ravens.metadata$3"), aligned(BLOCK_SIZE))) updateMetadataSec = {
 		.location = 0,
 		.bitField = {[0 ... (sizeof(updateMetadataSec.bitField) - 1)] = 0xff},
 		.footer = {
@@ -50,7 +50,7 @@ volatile const UpdateMetadata __attribute__((section(".rodata.Hermes.metadata$3"
 				.notExpired = 0
 		}};
 
-volatile const CriticalMetadata __attribute__((section(".rodata.Hermes.metadata$2"), aligned(BLOCK_SIZE))) criticalMetadata = {
+volatile const CriticalMetadata __attribute__((section(".rodata.Ravens.metadata$2"), aligned(BLOCK_SIZE))) criticalMetadata = {
 		.devicePublicKey = {0x4d, 0x97, 0x1b, 0x60, 0xfd, 0x83, 0x7f, 0x91, 0xfd, 0x7e, 0xc3, 0x38, 0xc2, 0x80, 0xb7, 0x9c, 0xd1, 0xac, 0x73, 0x60, 0xf7, 0x3c, 0x4c, 0xef, 0xd1, 0x9b, 0x6c, 0xc3, 0x7f, 0x5d, 0xcf, 0x06},
 		.updateChallenge = {0x42},
 		.versionID = 1,
@@ -59,13 +59,13 @@ volatile const CriticalMetadata __attribute__((section(".rodata.Hermes.metadata$
 		.valid = VALID_64B_VALUE
 };
 
-//In between, all the update code is shoved via the HERMES_CRITICAL macro
-volatile const uint8_t __attribute__((section(".rodata.Hermes.cache$1"), aligned(BLOCK_SIZE))) backupCache1[BLOCK_SIZE] = {[0 ... (BLOCK_SIZE - 1)] = 0xff};
-volatile const uint8_t __attribute__((section(".rodata.Hermes.cache$3"), aligned(BLOCK_SIZE))) backupCache2[BLOCK_SIZE] = {[0 ... (BLOCK_SIZE - 1)] = 0xff};
+//In between, all the update code is shoved via the RAVENS_CRITICAL macro
+volatile const uint8_t __attribute__((section(".rodata.Ravens.cache$1"), aligned(BLOCK_SIZE))) backupCache1[BLOCK_SIZE] = {[0 ... (BLOCK_SIZE - 1)] = 0xff};
+volatile const uint8_t __attribute__((section(".rodata.Ravens.cache$3"), aligned(BLOCK_SIZE))) backupCache2[BLOCK_SIZE] = {[0 ... (BLOCK_SIZE - 1)] = 0xff};
 
 uint8_t cacheRAM[BLOCK_SIZE] = {0};
 
-HERMES_CRITICAL volatile const UpdateMetadata * getMetadata()
+RAVENS_CRITICAL volatile const UpdateMetadata * getMetadata()
 {
 	if(isMetadataValid(updateMetadataMain))
 		return &updateMetadataMain;
@@ -78,7 +78,7 @@ void setMetadataPage(const UpdateMetadata * currentMetadata, const UpdateHeader 
 void resetMetadataPage(const UpdateMetadata * currentMetadata, uint32_t multiplier);
 
 //Clean all the metadata fields when starting the update so that we don't attempt to recover from a crash and load untrusted data
-HERMES_CRITICAL bool startUpdate()
+RAVENS_CRITICAL bool startUpdate()
 {
 	CriticalMetadata criticalMetadataCopy = criticalMetadata;
 
@@ -104,7 +104,7 @@ void requestUpdate(const void * updateLocation)
 	setMetadataPage((const UpdateMetadata *) getMetadata(), updateLocation, 0);
 }
 
-HERMES_CRITICAL void concludeUpdate(bool withError)
+RAVENS_CRITICAL void concludeUpdate(bool withError)
 {
 	//We backup the critical metadata page
 	erasePage((size_t) backupCache1);
@@ -143,7 +143,7 @@ HERMES_CRITICAL void concludeUpdate(bool withError)
 	enableIRQ();
 }
 
-HERMES_CRITICAL void validateCriticalMetadata()
+RAVENS_CRITICAL void validateCriticalMetadata()
 {
 	//If we could hide a public key somewhere, it'd be nice to sign the page and thus protect against forgery and leading us to trust an incorrect updateInProgress
 	if(criticalMetadata.valid == VALID_64B_VALUE)
@@ -164,7 +164,7 @@ HERMES_CRITICAL void validateCriticalMetadata()
 	writeToNAND((size_t) &criticalMetadata.valid, sizeof(criticalMetadataCopy.valid), (const uint8_t *) &criticalMetadataCopy.valid);
 }
 
-HERMES_CRITICAL void bootloaderPerformUpdate()
+RAVENS_CRITICAL void bootloaderPerformUpdate()
 {
 	validateCriticalMetadata();
 
@@ -246,7 +246,7 @@ HERMES_CRITICAL void bootloaderPerformUpdate()
 }
 
 void _start(void);
-HERMES_CRITICAL void _start_with_update()
+RAVENS_CRITICAL void _start_with_update()
 {
 	bootloaderPerformUpdate();
 	_start();
