@@ -10,8 +10,8 @@
  * @author Emile-Hugo Spir
  */
 
-#ifndef HERMES_TOKEN_H
-#define HERMES_TOKEN_H
+#ifndef RAVENS_TOKEN_H
+#define RAVENS_TOKEN_H
 
 #include <sys/param.h>
 #include <algorithm>
@@ -144,4 +144,4 @@ struct NetworkToken
 	bool operator<(const NetworkToken & b) const { return destinationBlockID < b.destinationBlockID; }
 	bool operator<(const BlockID & b) const { return destinationBlockID < b; }
 };
-#endif //HERMES_TOKEN_H
+#endif //RAVENS_TOKEN_H

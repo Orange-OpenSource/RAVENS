@@ -18,12 +18,12 @@
 #ifdef TARGET_LIKE_MBED
 	#include "core.h"
 #else
-	#define HERMES_CRITICAL
+	#define RAVENS_CRITICAL
 #endif
 
 #include "decoder.h"
 
-HERMES_CRITICAL uint64_t readBits(const uint8_t * bitField, size_t * currentOffset, size_t length, uint8_t lengthToRead)
+RAVENS_CRITICAL uint64_t readBits(const uint8_t * bitField, size_t * currentOffset, size_t length, uint8_t lengthToRead)
 {
 	uint64_t output = 0;
 
@@ -61,14 +61,14 @@ HERMES_CRITICAL uint64_t readBits(const uint8_t * bitField, size_t * currentOffs
 	return output;
 }
 
-HERMES_CRITICAL size_t readBlockID(DecoderContext * context, const uint8_t * byteStream, size_t * currentByteOffset, size_t length)
+RAVENS_CRITICAL size_t readBlockID(DecoderContext * context, const uint8_t * byteStream, size_t * currentByteOffset, size_t length)
 {
 	const size_t baseBlockID = readBits(byteStream, currentByteOffset, length, context->blockIDBits);
 
 	return context->blockBase + ((baseBlockID & MASK_OF_WIDTH(context->blockIDBits)) << context->blockSizeBitsRef);
 }
 
-HERMES_CRITICAL bool decodeInstruction(DecoderContext * context, const uint8_t * byteStream, size_t * currentByteOffset, const size_t length, DecodedCommand * command)
+RAVENS_CRITICAL bool decodeInstruction(DecoderContext * context, const uint8_t * byteStream, size_t * currentByteOffset, const size_t length, DecodedCommand * command)
 {
 	command->mainAddress = command->secondaryAddress = command->length = 0;
 

@@ -10,8 +10,8 @@
  * @author Emile-Hugo Spir
  */
 
-#ifndef HERMES_CONFIG_H
-#define HERMES_CONFIG_H
+#ifndef RAVENS_CONFIG_H
+#define RAVENS_CONFIG_H
 
 /*
  * Optimizations:
@@ -83,4 +83,4 @@ extern size_t _realFullAddressSpace;
 //How many uses of a BlockID warrant the overhead of a BLOCK_USE?
 #define BLOCK_USE_THRESHOLD 3
 
-#endif //HERMES_CONFIG_H
+#endif //RAVENS_CONFIG_H

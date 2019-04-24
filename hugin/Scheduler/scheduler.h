@@ -10,8 +10,8 @@
  * @author Emile-Hugo Spir
  */
 
-#ifndef HERMES_SCHEDULER_H
-#define HERMES_SCHEDULER_H
+#ifndef RAVENS_SCHEDULER_H
+#define RAVENS_SCHEDULER_H
 
 #include <cstdint>
 #include <vector>
@@ -396,4 +396,4 @@ namespace Scheduler
 	void extractNetwork(const vector<Block> & blocks, const size_t & baseBlockIndex, vector<size_t> & output);
 }
 
-#endif //HERMES_SCHEDULER_H
+#endif //RAVENS_SCHEDULER_H

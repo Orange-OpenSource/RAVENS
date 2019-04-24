@@ -10,8 +10,8 @@
  * @author Emile-Hugo Spir
  */
 
-#ifndef HERMES_BLOCK_H
-#define HERMES_BLOCK_H
+#ifndef RAVENS_BLOCK_H
+#define RAVENS_BLOCK_H
 
 struct BlockLink
 {
@@ -63,4 +63,4 @@ struct Block
 	bool operator>(const BlockID & b) const {	return blockID > b;	}
 };
 
-#endif //HERMES_BLOCK_H
+#endif //RAVENS_BLOCK_H

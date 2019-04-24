@@ -10,11 +10,11 @@
  * @author Emile-Hugo Spir
  */
 
-#ifndef HERMES_VALIDATION_H
-#define HERMES_VALIDATION_H
+#ifndef RAVENS_VALIDATION_H
+#define RAVENS_VALIDATION_H
 
 bool validateHeader(const UpdateHeader * header);
 bool validateImage(const UpdateHeader * header);
 bool validateExtraValidation(const UpdateHashRequest * request);
 
-#endif //HERMES_VALIDATION_H
+#endif //RAVENS_VALIDATION_H

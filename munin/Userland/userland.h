@@ -10,8 +10,8 @@
  * @author Emile-Hugo Spir
  */
 
-#ifndef HERMES_USERLAND_H
-#define HERMES_USERLAND_H
+#ifndef RAVENS_USERLAND_H
+#define RAVENS_USERLAND_H
 
 #ifndef TARGET_LIKE_MBED
 	void itoa(uint32_t value, char * string, int base);
@@ -22,4 +22,4 @@ void eraseNecessarySpace(const void * basePointer, uint32_t length);
 uint32_t getVersion();
 void checkUpdate();
 
-#endif //HERMES_USERLAND_H
+#endif //RAVENS_USERLAND_H

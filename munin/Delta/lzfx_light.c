@@ -27,7 +27,7 @@
 /* These cannot be changed, as they are related to the compressed format. */
 #define MAX_OFF_FORMAT_1 (1u << 11u)
 
-HERMES_CRITICAL uint8_t * getOutputPointerWithBackOffset(Lzfx4KContext * context, uint16_t backOffset)
+RAVENS_CRITICAL uint8_t * getOutputPointerWithBackOffset(Lzfx4KContext * context, uint16_t backOffset)
 {
 	uint16_t currentOffset = (uint16_t) (context->output - context->referenceOutput);
 	backOffset &= context->outputRealSize - 1u;
@@ -38,7 +38,7 @@ HERMES_CRITICAL uint8_t * getOutputPointerWithBackOffset(Lzfx4KContext * context
 	return context->referenceOutput + context->outputRealSize + currentOffset - backOffset;
 }
 
-HERMES_CRITICAL uint16_t availableRoomBeforeLoopback(Lzfx4KContext * context, const uint8_t * ptr)
+RAVENS_CRITICAL uint16_t availableRoomBeforeLoopback(Lzfx4KContext * context, const uint8_t * ptr)
 {
 	if(ptr < context->referenceOutput || ptr >= context->referenceOutput + context->outputRealSize)
 		return 0;
@@ -46,7 +46,7 @@ HERMES_CRITICAL uint16_t availableRoomBeforeLoopback(Lzfx4KContext * context, co
 	return (uint16_t) (context->outputRealSize - (ptr - context->referenceOutput));
 }
 
-HERMES_CRITICAL void resumeCurrentSegment(Lzfx4KContext * context, const uint16_t outputLength)
+RAVENS_CRITICAL void resumeCurrentSegment(Lzfx4KContext * context, const uint16_t outputLength)
 {
 	if(context->status == LZFX_OK)
 		return;
@@ -103,7 +103,7 @@ HERMES_CRITICAL void resumeCurrentSegment(Lzfx4KContext * context, const uint16_
 	}
 }
 
-HERMES_CRITICAL int lzfx_decompress(Lzfx4KContext * context, uint16_t *outputLength)
+RAVENS_CRITICAL int lzfx_decompress(Lzfx4KContext * context, uint16_t *outputLength)
 {
 	if (outputLength == NULL)
 		return LZFX_EARGS;

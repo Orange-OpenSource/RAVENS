@@ -58,7 +58,7 @@ IAPCode verify_erased(int address, unsigned int length);
 IAPCode check_error(void);
 IAPCode program_word(int address, char *data);
 
-HERMES_CRITICAL IAPCode erase_sector(int address) {
+RAVENS_CRITICAL IAPCode erase_sector(int address) {
     #ifdef IAPDEBUG
     printf("IAP: Erasing at %x\r\n", address);
     #endif
@@ -76,7 +76,7 @@ HERMES_CRITICAL IAPCode erase_sector(int address) {
     return check_error();
 }
 
-HERMES_CRITICAL IAPCode program_flash(int address, char *data, unsigned int length) {
+RAVENS_CRITICAL IAPCode program_flash(int address, char *data, unsigned int length) {
     #ifdef IAPDEBUG
     printf("IAP: Programming flash at %x with length %d\r\n", address, length);
     #endif
@@ -112,14 +112,14 @@ HERMES_CRITICAL IAPCode program_flash(int address, char *data, unsigned int leng
     return Success;
 }
 
-HERMES_CRITICAL uint32_t flash_size(void) {
+RAVENS_CRITICAL uint32_t flash_size(void) {
     uint32_t retval = (SIM->FCFG2 & 0x7F000000u) >> (24-13);
     if (SIM->FCFG2 & (1<<23))           //Possible second flash bank
         retval += (SIM->FCFG2 & 0x007F0000u) >> (16-13);
     return retval;
 }
 
-HERMES_CRITICAL IAPCode program_word(int address, char *data) {
+RAVENS_CRITICAL IAPCode program_word(int address, char *data) {
     #ifdef IAPDEBUG
     #ifdef USE_ProgramPhrase
     printf("IAP: Programming word at %x, %d - %d - %d - %d - %d - %d - %d - %d\r\n", address, data[0], data[1], data[2], data[3], data[4], data[5], data[6], data[7]);
@@ -160,7 +160,7 @@ HERMES_CRITICAL IAPCode program_word(int address, char *data) {
 }
 
 /* Clear possible flags which are set, run command, wait until done */
-HERMES_CRITICAL void run_command(void) {
+RAVENS_CRITICAL void run_command(void) {
     //Disable IRQs, preventing IRQ routines from trying to access flash (thanks to https://mbed.org/users/mjr/)
     disableIRQ();
 
@@ -176,7 +176,7 @@ HERMES_CRITICAL void run_command(void) {
 
 /* Check if no flash boundary is violated
    Returns true on violation */
-HERMES_CRITICAL bool check_boundary(int address, unsigned int length) {
+RAVENS_CRITICAL bool check_boundary(int address, unsigned int length) {
     int temp = (address+length - 1) / SECTOR_SIZE;
     address /= SECTOR_SIZE;
     bool retval = (address != temp);
@@ -189,7 +189,7 @@ HERMES_CRITICAL bool check_boundary(int address, unsigned int length) {
 
 /* Check if address is correctly aligned
    Returns true on violation */
-HERMES_CRITICAL bool check_align(int address) {
+RAVENS_CRITICAL bool check_align(int address) {
     bool retval = address & 0x03;
     #ifdef IAPDEBUG
     if (retval)
@@ -200,7 +200,7 @@ HERMES_CRITICAL bool check_align(int address) {
 
 /* Check if an area of flash memory is erased
    Returns error code or Success (in case of fully erased) */
-HERMES_CRITICAL IAPCode verify_erased(int address, unsigned int length) {
+RAVENS_CRITICAL IAPCode verify_erased(int address, unsigned int length) {
     #ifdef IAPDEBUG
     printf("IAP: Verify erased at %x with length %d\r\n", address, length);
     #endif
@@ -253,7 +253,7 @@ HERMES_CRITICAL IAPCode verify_erased(int address, unsigned int length) {
 
 /* Check if an error occured
    Returns error code or Success*/
-HERMES_CRITICAL IAPCode check_error(void) {
+RAVENS_CRITICAL IAPCode check_error(void) {
     if (FTFA->FSTAT & FTFA_FSTAT_FPVIOL_MASK) {
         #ifdef IAPDEBUG
         printf("IAP: Protection violation\r\n");

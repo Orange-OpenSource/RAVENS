@@ -10,8 +10,8 @@
  * @author Emile-Hugo Spir
  */
 
-#ifndef HERMES_EXECUTION_H
-#define HERMES_EXECUTION_H
+#ifndef RAVENS_EXECUTION_H
+#define RAVENS_EXECUTION_H
 
 #include "../io_management.h"
 
@@ -29,4 +29,4 @@ void restoreCache(size_t counter);
 void incrementCounter(size_t *counter, size_t oldCounter, bool *fastForward);
 size_t getCurrentCounter();
 
-#endif //HERMES_EXECUTION_H
+#endif //RAVENS_EXECUTION_H

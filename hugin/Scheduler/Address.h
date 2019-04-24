@@ -10,8 +10,8 @@
  * @author Emile-Hugo Spir
  */
 
-#ifndef HERMES_ADDRESS_H
-#define HERMES_ADDRESS_H
+#ifndef RAVENS_ADDRESS_H
+#define RAVENS_ADDRESS_H
 
 struct Address;
 
@@ -78,4 +78,4 @@ struct Address
 	size_t getAddress() const { return value; }
 };
 
-#endif //HERMES_ADDRESS_H
+#endif //RAVENS_ADDRESS_H

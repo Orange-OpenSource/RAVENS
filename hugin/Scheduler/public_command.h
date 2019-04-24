@@ -10,8 +10,8 @@
  * @author Emile-Hugo Spir
  */
 
-#ifndef HERMES_PUBLIC_COMMAND_H
-#define HERMES_PUBLIC_COMMAND_H
+#ifndef RAVENS_PUBLIC_COMMAND_H
+#define RAVENS_PUBLIC_COMMAND_H
 
 #include "config.h"
 
@@ -132,4 +132,4 @@ bool virtualMachine(const std::vector<PublicCommand> & commands, uint8_t * flash
 
 void dumpCommands(const std::vector<PublicCommand> & commands, const char *path = nullptr);
 
-#endif //HERMES_PUBLIC_COMMAND_H
+#endif //RAVENS_PUBLIC_COMMAND_H

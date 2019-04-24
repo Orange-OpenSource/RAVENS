@@ -30,7 +30,7 @@ typedef unsigned int uint;
 #include "../core.h"
 #include "../driver_api.h"
 
-const uint8_t __attribute__((section(".rodata.Hermes.storageRoom"), aligned(BLOCK_SIZE))) updateStorage[16 * BLOCK_SIZE] = {0xff};	//65kB of room.
+const uint8_t __attribute__((section(".rodata.Ravens.storageRoom"), aligned(BLOCK_SIZE))) updateStorage[16 * BLOCK_SIZE] = {0xff};	//65kB of room.
 
 void sendManifestRequest()
 {

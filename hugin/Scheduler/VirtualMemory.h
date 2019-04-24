@@ -10,8 +10,8 @@
  * @author Emile-Hugo Spir
  */
 
-#ifndef HERMES_VIRTUALMEMORY_H
-#define HERMES_VIRTUALMEMORY_H
+#ifndef RAVENS_VIRTUALMEMORY_H
+#define RAVENS_VIRTUALMEMORY_H
 
 #include <unordered_set>
 #include <unordered_map>
@@ -530,4 +530,4 @@ private:
 };
 
 
-#endif //HERMES_VIRTUALMEMORY_H
+#endif //RAVENS_VIRTUALMEMORY_H

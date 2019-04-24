@@ -10,8 +10,8 @@
  * @author Emile-Hugo Spir
  */
 
-#ifndef HERMES_DETAILEDBLOCK_H
-#define HERMES_DETAILEDBLOCK_H
+#ifndef RAVENS_DETAILEDBLOCK_H
+#define RAVENS_DETAILEDBLOCK_H
 
 //Source is where the data we need currently is
 //Destination is where the data belong
@@ -401,4 +401,4 @@ protected:
 	}
 };
 
-#endif //HERMES_DETAILEDBLOCK_H
+#endif //RAVENS_DETAILEDBLOCK_H

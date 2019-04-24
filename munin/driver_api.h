@@ -10,8 +10,8 @@
  * @author Emile-Hugo Spir
  */
 
-#ifndef HERMES_DRIVER_API_H
-#define HERMES_DRIVER_API_H
+#ifndef RAVENS_DRIVER_API_H
+#define RAVENS_DRIVER_API_H
 
 //Device specific APIs
 
@@ -27,12 +27,12 @@ void disableIRQ();
 
 //Those methods must always be available during the update
 #ifndef NO_CRITICAL
-	HERMES_CRITICAL void eraseSector(size_t address);
-	HERMES_CRITICAL void programFlash(size_t address, const uint8_t *data, size_t length);
+	RAVENS_CRITICAL void eraseSector(size_t address);
+	RAVENS_CRITICAL void programFlash(size_t address, const uint8_t *data, size_t length);
 #endif
 
 #ifdef __cplusplus
 };
 #endif
 
-#endif //HERMES_DRIVER_API_H
+#endif //RAVENS_DRIVER_API_H

@@ -17,11 +17,11 @@
 #ifdef TARGET_LIKE_MBED
 #include "../core.h"
 #else
-#define HERMES_CRITICAL
+#define RAVENS_CRITICAL
 #endif
 
 
-HERMES_CRITICAL bool validateSignature(const uint8_t * message, const size_t messageLength, const uint8_t signature[hydro_sign_BYTES], const uint8_t publicKey[hydro_sign_PUBLICKEYBYTES])
+RAVENS_CRITICAL bool validateSignature(const uint8_t * message, const size_t messageLength, const uint8_t signature[hydro_sign_BYTES], const uint8_t publicKey[hydro_sign_PUBLICKEYBYTES])
 {
 	return hydro_sign_verify(signature, message, messageLength, CONTEXT, publicKey) == 0;
 }
