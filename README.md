@@ -7,6 +7,8 @@ RAVENS, which stands for Resilient Architecture for Very Efficient firmware upda
 
 Properly used, Hugin and Munin enable secure and efficient firmware updates of very small IoT devices.
 
+**Important Note**: The original creators of the project have left the company. You may find a fork by the original developer at the [following URL](https://github.com/Taiki-San/RAVENS/).
+
 # Build
 
 ## Hugin
